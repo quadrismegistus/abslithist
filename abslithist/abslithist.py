@@ -3,7 +3,7 @@ from tools import *
 from tqdm import tqdm
 from collections import defaultdict
 import requests,json,pandas as pd,numpy as np,pickle
-import shutil,zipfile
+import shutil,zipfile,random
 import warnings
 warnings.filterwarnings('ignore')
 

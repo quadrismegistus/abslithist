@@ -30,6 +30,33 @@ Simple mofo'n parallelism with progress bar. Born of frustration with p_tqdm.
 """
 
 
+def display_source(code):
+	import IPython
+	def _jupyterlab_repr_html_(self):
+		from pygments import highlight
+		from pygments.formatters import HtmlFormatter
+
+		fmt = HtmlFormatter()
+		style = "<style>{}\n{}\n{}\n</style>".format(
+			fmt.get_style_defs(".output_html"),
+			fmt.get_style_defs(".jp-RenderedHTML"),
+			'.jp-RenderedHTML span { font-size:0.8em }'
+		)
+		return style + highlight(self.data, self._get_lexer(), fmt)
+
+	# Replace _repr_html_ with our own version that adds the 'jp-RenderedHTML' class
+	# in addition to 'output_html'.
+	IPython.display.Code._repr_html_ = _jupyterlab_repr_html_
+	return IPython.display.Code(data=code, language="python3")
+
+def source(x):
+	from IPython.display import Code,display
+	if type(x)!=str:
+		import inspect
+		x=inspect.getsource(x)
+	display(display_source(x))
+
+
 def pmap_iter(func, objs, num_proc=4, use_threads=False, progress=True, desc=None):
 	"""
 	Yields results of func(obj) for each obj in objs

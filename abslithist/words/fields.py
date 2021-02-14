@@ -7,7 +7,8 @@ PATH_FIELDS_JSON = os.path.join(FIELD_DIR,'data.fields_orig.json')
 PATH_VECFIELDS_JSON = os.path.join(FIELD_DIR,'data.fields_vec.json')
 PATH_FIELD2VEC_PKL = os.path.join(FIELD_DIR,'data.models.word_and_field_vecs.pkl')
 PATH_NORMS = os.path.join(FIELD_DIR,'data.wordnorms_orig.csv')
-PATH_VECNORMS = os.path.join(FIELD_DIR,'data.wordnorms_vec.csv')
+VECNORMS_FN='data.wordnorms_vec.csv'
+PATH_VECNORMS = os.path.join(FIELD_DIR,VECNORMS_FN)
 if not os.path.exists(SOURCE_DIR): os.makedirs(SOURCE_DIR)
 ZCUT = ZCUT_NORMS_ORIG
 
@@ -31,10 +32,11 @@ def add_series_to_fields(series,fields,method,contrast='Abs-Conc',contrast_vals=
 def add_series_to_norms(series,source,norms,series_std={},**attrs):
     seriesz=zfy(series)
     done=set()
-    for v,z,w in zip(series,seriesz,series.index):
+    #for v,z,w in zip(series,seriesz,series.index):
+    for w,z in zip(seriesz.index,seriesz):
         wdx={
             'word':w,
-            'score':v,
+            'score':series[w],
             #'std':series_std.get(w),
             'z':z,
             'source':source,
@@ -45,7 +47,7 @@ def add_series_to_norms(series,source,norms,series_std={},**attrs):
 
 
 
-def add_fields_paivio(fields,norms,prefix='PAV'):
+def gen_norms_paivio(norms,prefix='PAV'):
     pav_path_pdf=os.path.join(SOURCE_DIR,'Paivio1968.pdf')
     pav_path_csv=os.path.join(SOURCE_DIR,'Paivio1968.csv')
     # generate table from PDF if CSV does not exist
@@ -60,13 +62,13 @@ def add_fields_paivio(fields,norms,prefix='PAV'):
     # load csv
     df_paivio=pd.read_csv(pav_path_csv).set_index('word')
     # add to norms
-    add_series_to_norms(series=df_paivio.CONC_M,source='PAV-Conc',norms=norms,series_std=df_paivio.CONC_SD)
-    add_series_to_norms(series=df_paivio.IMAG_M,source='PAV-Imag',norms=norms,series_std=df_paivio.IMAG_SD)
+    add_series_to_norms(series=df_paivio.CONC_M,source='Abs-Conc.PAV-Conc',norms=norms,series_std=df_paivio.CONC_SD)
+    add_series_to_norms(series=df_paivio.IMAG_M,source='Abs-Conc.PAV-Imag',norms=norms,series_std=df_paivio.IMAG_SD)
     # add to fields
-    add_series_to_fields(series=df_paivio.CONC_M,fields=fields,method='PAV-Conc')
-    add_series_to_fields(series=df_paivio.IMAG_M,fields=fields,method='PAV-Imag')
+    #add_series_to_fields(series=df_paivio.CONC_M,fields=fields,method='PAV-Conc')
+    #add_series_to_fields(series=df_paivio.IMAG_M,fields=fields,method='PAV-Imag')
 
-def add_fields_mrc(fields,norms,prefix='MRC'):
+def gen_norms_mrc(norms,prefix='MRC'):
     # urls and paths
     mrc_url_zip='https://ota.bodleian.ox.ac.uk/repository/xmlui/bitstream/handle/20.500.12024/1054/1054.zip?sequence=3&isAllowed=y'
     mrc_path_zip=os.path.join(SOURCE_DIR,'mrc.zip')
@@ -132,17 +134,17 @@ def add_fields_mrc(fields,norms,prefix='MRC'):
     mrc_df=pd.DataFrame(mrc_ld).groupby(['word']).median().reset_index().set_index('word')
     
     # add series's
-    add_series_to_norms(series=mrc_df['CONC'], source='MRC-Conc', norms=norms)
-    add_series_to_norms(series=mrc_df['IMAG'], source='MRC-Imag', norms=norms)
+    add_series_to_norms(series=mrc_df['CONC'], source='Abs-Conc.MRC-Conc', norms=norms)
+    add_series_to_norms(series=mrc_df['IMAG'], source='Abs-Conc.MRC-Imag', norms=norms)
 
     # add fields
-    add_series_to_fields(series=mrc_df.CONC,fields=fields,method='MRC-Conc')
-    add_series_to_fields(series=mrc_df.IMAG,fields=fields,method='MRC-Imag')
-    add_series_to_fields(series=mrc_df.AOA,fields=fields,method='MRC-AOA',contrast='Early-Late',contrast_vals=['Early','Neither','Late'])
+    # add_series_to_fields(series=mrc_df.CONC,fields=fields,method='MRC-Conc')
+    # add_series_to_fields(series=mrc_df.IMAG,fields=fields,method='MRC-Imag')
+    # add_series_to_fields(series=mrc_df.AOA,fields=fields,method='MRC-AOA',contrast='Early-Late',contrast_vals=['Early','Neither','Late'])
 
 
 ## Brysbaert et al
-def add_fields_brys(fields,norms,prefix='MT'):
+def gen_norms_brys(norms,prefix='MT'):
     # paths
     mturk_url='http://crr.ugent.be/papers/Concreteness_ratings_Brysbaert_et_al_BRM.txt'
     mturk_path=os.path.join(SOURCE_DIR,'Concreteness_ratings_Brysbaert_et_al_BRM.txt')
@@ -155,11 +157,11 @@ def add_fields_brys(fields,norms,prefix='MT'):
     df_brys['word']=df_brys.index
     df_brys=df_brys[df_brys.word.apply(lambda x: type(x)==str and ' ' not in x)]
     # add series
-    add_series_to_norms(series=df_brys['Conc.M'], source='MT-Conc', norms=norms, series_std=df_brys['Conc.SD'])
+    add_series_to_norms(series=df_brys['Conc.M'], source='Abs-Conc.MT-Conc', norms=norms, series_std=df_brys['Conc.SD'])
     # add fields
-    add_series_to_fields(series=df_brys['Conc.M'],fields=fields,method='MT-Conc')
+    #add_series_to_fields(series=df_brys['Conc.M'],fields=fields,method='MT-Conc')
 
-def add_fields_lsn(fields,norms):
+def gen_norms_lsn(norms):
     # paths
     url_lsn_csv='https://osf.io/48wsc/download'
     path_lsn_csv=os.path.join(SOURCE_DIR,'Lancaster_sensorimotor_norms_for_39707_words.csv')
@@ -171,59 +173,191 @@ def add_fields_lsn(fields,norms):
     df_lsn=df_lsn[~df_lsn.Word.str.contains(' ')]
     df_lsn=df_lsn.set_index('Word')
     # add norms
-    add_series_to_norms(series=df_lsn['Minkowski3.perceptual'], source='LSN-Perc', norms=norms)
-    add_series_to_norms(series=df_lsn['Minkowski3.sensorimotor'], source='LSN-Sens', norms=norms)
-    add_series_to_norms(series=df_lsn['Minkowski3.action'], source='LSN-Act', norms=norms)
-    add_series_to_norms(series=df_lsn['Visual.mean'], source='LSN-Imag', norms=norms)
+    add_series_to_norms(series=df_lsn['Minkowski3.perceptual'], source='Abs-Conc.LSN-Perc', norms=norms)
+    add_series_to_norms(series=df_lsn['Minkowski3.sensorimotor'], source='Abs-Conc.LSN-Sens', norms=norms)
+    # add_series_to_norms(series=df_lsn['Minkowski3.action'], source='Abs-Conc.LSN-Act', norms=norms)
+    add_series_to_norms(series=df_lsn['Visual.mean'], source='Abs-Conc.LSN-Imag', norms=norms)
     # add to fields
-    add_series_to_fields(df_lsn['Visual.mean'],fields=fields,method='LSN-Imag')
-    add_series_to_fields(df_lsn['Minkowski3.perceptual'],fields=fields,method='LSN-Perc')
-    add_series_to_fields(df_lsn['Minkowski3.action'],fields=fields,method='LSN-Act')
-    add_series_to_fields(df_lsn['Minkowski3.sensorimotor'],fields=fields,method='LSN-Sens')
+    # add_series_to_fields(df_lsn['Visual.mean'],fields=fields,method='LSN-Imag')
+    # add_series_to_fields(df_lsn['Minkowski3.perceptual'],fields=fields,method='LSN-Perc')
+    # add_series_to_fields(df_lsn['Minkowski3.action'],fields=fields,method='LSN-Act')
+    # add_series_to_fields(df_lsn['Minkowski3.sensorimotor'],fields=fields,method='LSN-Sens')
 
 
-
-def gen_fields_and_norms():
+def gen_orignorms():
     # init
     fields=defaultdict(set)
     norms=[]
 
     # add fields (so far, only quant/scale-based ones)
     funcs=[
-        add_fields_paivio, # Paivo et al
-        add_fields_mrc,    # MRC
-        add_fields_brys,   # Brysbaert et al
-        add_fields_lsn     # LSN
+        gen_norms_paivio, # Paivo et al
+        gen_norms_mrc,    # MRC
+        gen_norms_brys,   # Brysbaert et al
+        gen_norms_lsn     # LSN
     ]
 
     # run through functions
     for func in tqdm(funcs,desc='Building fields and norms from sources'):
-        func(fields,norms)
+        func(norms)
 
-    # save fields
-    fields_save=dict((k,list(v)) for k,v in fields.items())
-    with open(PATH_FIELDS_JSON,'w') as of: json.dump(fields_save, of)
-    
     # save norms
     qdf=pd.DataFrame(norms)
     qdf=qdf.drop_duplicates(['word','source'],keep='first')
     qdf.to_csv(PATH_NORMS,index=False)
     
 
+
+#################
+# Norms -> Fields
+#
+
+def get_fields_from_norms(path_norms,zcut=ZCUT,name_neither='Neither'):
+    dfnorms=pd.read_csv(path_norms)
+    fields=dict()
+    for source,sourcedf in dfnorms.groupby('source'):
+        if not '.' in source: continue
+        contrast,method=source.split('.')
+        if not '-' in contrast: continue
+        pos,neg=contrast.split('-')
+        fields[f'{contrast}.{method}.{pos}']=poswords=set(sourcedf[sourcedf.z<=-zcut].word)
+        fields[f'{contrast}.{method}.{neg}']=negwords=set(sourcedf[sourcedf.z>=zcut].word)
+        fields[f'{contrast}.{method}.{name_neither}'] = set(sourcedf.word) - poswords - negwords
+    for field in fields:
+        fields[field]={w for w in fields[field] if type(w)==str}
+    return fields
+
+
 def get_origfields():
-    with open(PATH_FIELDS_JSON) as f: d=json.load(f)
-    for k,v in d.items(): d[k]=set(v)
-    return d
+    return get_fields_from_norms(PATH_NORMS)
+def get_vecfields():
+    return get_fields_from_norms
+
+def get_fields():
+    fields={}
+    for field,words in get_origfields():
+        fields[field+'._orig']=words
+    for field,words in get_vecfields():
+        fields[field]=words
+    return fields
+def get_vecnorms():
+    return pd.read_csv(PATH_VECNORMS)
+
+def sample(l,n=10):
+    wordstr=', '.join([str(w) for w in (l if len(l)<n else random.sample(l,n))])
+    return f'{wordstr} ... ({len(l)})'
+
+def show_fields(fields):
+    ld = [
+        {
+            'field':field,
+            'num':len(fields[field]),
+            'words':sample(fields[field])
+        } for field in fields
+    ]
+    pd.options.display.max_colwidth=100
+    return pd.DataFrame(ld).set_index('field').sort_values('num',ascending=False)
+
+def format_contrasts(fields,neither='Neither',show_sample=False,sample_n=10):
+    contrasts = {x.split('.')[0] for x in fields}
+    methods = {x.split('.')[1] for x in fields}
+    periods = {'.'+x.split('.')[3] if x.count('.')>2 else ''for x in fields}
+
+    ld=[]
+
+    for contrast in contrasts:
+        pos,neg=contrast.split('-')
+        for method in methods:
+            for period in periods:
+                poskey=f'{contrast}.{method}.{pos}{period}'
+                negkey=f'{contrast}.{method}.{neg}{period}'
+                neitherkey=f'{contrast}.{method}.{neither}{period}'
+                if poskey not in fields or negkey not in fields or neitherkey not in fields:
+                    continue
+                dx={
+                    'contrast':contrast,
+                    'method':method,
+                    'neg':fields[negkey] if not show_sample else sample(fields[negkey]),
+                    'pos':fields[poskey] if not show_sample else sample(fields[poskey]),
+                    'neither':fields[neitherkey] if not show_sample else sample(fields[neitherkey]),
+                }
+                ld.append(dx)
+    return ld
+
+def show_contrasts(fields):
+    pd.options.display.max_colwidth=50
+    df=pd.DataFrame(format_contrasts(fields,show_sample=True)).sort_values(['contrast','method'])
+    return df.set_index(['contrast','method'])
+    
+
+def get_contrasts(fields):
+    return format_contrasts(fields)
+
+def get_origcontrasts():
+    return get_contrasts(get_origfields())
+
+def get_veccontrasts():
+    return get_contrasts(get_vecfields())
+
+
+
+
+
+###############
+# VECTOR FIELDS
+#
+
+
+def gen_vecnorms
+
+
+
+
+
 
 
 ### VEC FIELDS
+
+# This function computes all contast and vectors
+def compute_fieldvecs_in_model(model):#, incl_non_contrasts=False, incl_contrasts=True):
+    """
+    Compute field vectors in a model
+    """
+    ### LOAD
+    contrasts_ld = get_origcontrasts()
+    for cdx in contrast_methods:
+        contrast=cdx['contrast']
+        method=cdx['method']
+        poswords=cdx['pos']
+        negwords=cdx['neg']
+        field2vec[f'{contrast}.{method}']=compute_vector(model,poswords,negwords)
+    return field2vec
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def _calc_norms_dist_group(obj):
     path_ld_group=obj
     fields=get_origfields()
 
     # get fn
     pathd=path_ld_group[0]
-    ofn_norms=os.path.join(PATH_MODELS,pathd['corpus'],pathd['period_start']+'-'+pathd['period_end'],'data.wordnorms_vec.csv')
+    ofn_norms=os.path.join(PATH_MODELS,pathd['corpus'],pathd['period_start']+'-'+pathd['period_end'],VECNORMS_FN)
     if os.path.exists(ofn_norms): return
 
     # loop
@@ -261,7 +395,35 @@ def gen_vecnorms():
     pmap(_calc_norms_dist_group,groups,desc='Generating norms across model-periods',num_proc=1)
         
 
-         
+def agg_vecnorms(bin_year_by=100):
+    """
+    Aggregate model-periods' vecnorms by century/yearbin
+    """
+    from abslithist.models.embeddings import get_model_paths
+
+    def periodize(y):
+        y=int(y)
+        if bin_year_by==100:
+            return f'C{(y//100) + 1}'
+        else:
+            return y//bin_year_by * bin_year_by
+
+    
+    paths_ld = get_model_paths(model_fn=VECNORMS_FN)
+    paths_df = pd.DataFrame(paths_ld)
+    paths_df['yearbin'] = paths_df['period_start'].apply(periodize)
+
+    ## agg by period
+    alldf=pd.DataFrame()
+    for period,perioddf in tqdm(list(paths_df.groupby('yearbin'))):
+        newdf=pd.DataFrame()
+        for path in perioddf.path:
+            pathdf=pd.read_csv(path)
+            newdf=newdf.append(pathdf)
+        newdf=newdf.groupby(['word','source']).median().reset_index()
+        newdf['period']=period
+        alldf=alldf.append(newdf)
+    alldf.to_csv(PATH_VECNORMS,index=False)
 
 
 

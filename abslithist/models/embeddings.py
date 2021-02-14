@@ -15,14 +15,17 @@ def get_model_paths(model_dir=PATH_MODELS,model_fn='model.txt.gz',vocab_fn='voca
     for root,dirs,fns in os.walk(PATH_MODELS):
         if model_fn in fns:
             corpus,period,run=root.split('/')[-3:]
+            if not 'run_' in run:
+                corpus,period=root.split('/')[-2:]
+                run=None
             dx={
                 'corpus':corpus,
                 'period_start':period.split('-')[0],
                 'period_end':period.split('-')[-1],
-                'run':run,
                 'path':os.path.join(root,model_fn),
                 'path_vocab':os.path.join(root,vocab_fn)
             }
+            if run is not None: dx['run']=run
             ld.append(dx)
     return ld
 
@@ -80,37 +83,37 @@ def compute_vecfields():
 
 
 
-# This function computes all contast and vectors
-def compute_field_vectors(model, fields, incl_non_contrasts=False, incl_contrasts=True):
-    """
-    Compute field vectors in a model
-    """
+# # This function computes all contast and vectors
+# def compute_field_vectors(model, fields, incl_non_contrasts=False, incl_contrasts=True):
+#     """
+#     Compute field vectors in a model
+#     """
     
-    ### LOAD
-    # create dictionary from field -> vecs
-    field2vec={}
-    # First get non-contrasts
-    if incl_non_contrasts:
-        for field,words in fields.items():
-            field2vec[field]=compute_vector(model,words)
-    # Then get contrasts
-    if incl_contrasts:
-        contrast_methods = {
-            tuple(fieldname.split('.')[:2]) for fieldname in fields
-            if '-' in fieldname.split('.')[0]
-        }
-        for contrast,method in contrast_methods:
-            contrast_pos,contrast_neg=contrast.split('-')
-            key_pos = f'{contrast}.{method}.{contrast_pos}'
-            key_neg = f'{contrast}.{method}.{contrast_neg}'
-            key_neither = f'{contrast}.{method}.Neither'
-            if key_pos in fields and key_neg in fields:
-                field2vec[f'{contrast}.{method}']=compute_vector(model,fields[key_pos],fields[key_neg])
-                #if key_neg in fields:
-                #    field2vec[f'{contrast_pos}-Neither.{method}']=compute_vector(model,fields[key_pos],fields[key_neither])
-                #    field2vec[f'{contrast_neg}-Neither.{method}']=compute_vector(model,fields[key_neg],fields[key_neither])
+#     ### LOAD
+#     # create dictionary from field -> vecs
+#     field2vec={}
+#     # First get non-contrasts
+#     if incl_non_contrasts:
+#         for field,words in fields.items():
+#             field2vec[field]=compute_vector(model,words)
+#     # Then get contrasts
+#     if incl_contrasts:
+#         contrast_methods = {
+#             tuple(fieldname.split('.')[:2]) for fieldname in fields
+#             if '-' in fieldname.split('.')[0]
+#         }
+#         for contrast,method in contrast_methods:
+#             contrast_pos,contrast_neg=contrast.split('-')
+#             key_pos = f'{contrast}.{method}.{contrast_pos}'
+#             key_neg = f'{contrast}.{method}.{contrast_neg}'
+#             key_neither = f'{contrast}.{method}.Neither'
+#             if key_pos in fields and key_neg in fields:
+#                 field2vec[f'{contrast}.{method}']=compute_vector(model,fields[key_pos],fields[key_neg])
+#                 #if key_neg in fields:
+#                 #    field2vec[f'{contrast_pos}-Neither.{method}']=compute_vector(model,fields[key_pos],fields[key_neither])
+#                 #    field2vec[f'{contrast_neg}-Neither.{method}']=compute_vector(model,fields[key_neg],fields[key_neither])
 
-    return field2vec
+#     return field2vec
 
 
 

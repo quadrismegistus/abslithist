@@ -1,64 +1,6 @@
-import os,sys,time,json,gzip,pickle,random
-from collections import defaultdict,Counter
-from tqdm import tqdm
-import numpy as np,pandas as pd
-from scipy.stats import zscore
+import os,sys; sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),'..','..'))
+from abslithist import *
 
-ABSLITHIST_ROOT='/home/ryan/github/AbsLitHist'
-VECDB_DIR=f'{ABSLITHIST_ROOT}/data/vecdb'
-PATH_WORDNORM_ORIG=f'{ABSLITHIST_ROOT}/data/fields/data.wordnorms_orig.csv'
-PATH_VECFIELDS_JSON=f'{ABSLITHIST_ROOT}/data/fields/data.vec.json.gz'
-PATH_FIELDS_JSON=f'{ABSLITHIST_ROOT}/data/fields/data.fields.json'
-PATH_FIELDS_PKL=f'{ABSLITHIST_ROOT}/data/fields/data.fields.orig_and_vec.pickle'
-PATH_STOPWORDS=f'{ABSLITHIST_ROOT}/data/fields/stopwords.txt'
-PATH_NAMES=f'{ABSLITHIST_ROOT}/data/fields/capslocked.CanonFiction.txt'
-BAD_METHODS={'LSN-Act','Ness'}
-GOOD_METHODS=['PAV-Conc','MRC-Conc','MT-Conc','PAV-Imag','MRC-Imag','LSN-Imag','LSN-Perc','LSN-Sens']
-keytypes=['all','abs','conc','neither']
-FIELDS=None
-
-
-def get_vecfields():
-	#with gzip.open(PATH_VECFIELDS_JSON) as f: d=json.load(f)
-	with open(PATH_FIELDS_PKL,'rb') as f: d=pickle.load(f)
-	return d
-def get_origfields():
-	with open(PATH_FIELDS_JSON) as f: d=json.load(f)
-	return d
-
-def get_fields(fieldprefix='Abs-Conc.',fieldsuffix='',remove_stopwords=True):
-	global FIELDS
-	if FIELDS is not None: return FIELDS
-	## HEAVY LIFTING??
-	now=time.time()
-	stopwords=set() if not remove_stopwords else get_stopwords()
-
-	# load orig
-	origfields = get_origfields()
-	# load vec'd
-	vecfields = get_vecfields()
-	# combine (bit adhoc: adding the neutrals)	
-	fields = vecfields
-	fields['Abs-Conc.PAV-Conc.Neither._orig'] = origfields['PAV.Conc.Neither']
-	fields['Abs-Conc.PAV-Imag.Neither._orig'] = origfields['PAV.Imag.Neither']
-	fields['Abs-Conc.MRC-Conc.Neither._orig'] = origfields['MRC.Conc.Neither']
-	fields['Abs-Conc.MRC-Imag.Neither._orig'] = origfields['MRC.Imag.Neither']
-	fields['Abs-Conc.MT.Neither._orig'] = origfields['MT.Neither']
-	fields['Abs-Conc.LSN-Act.Neither._orig'] = origfields['LSN.Action.Neither']
-	fields['Abs-Conc.LSN-Sens.Neither._orig'] = origfields['LSN.Sensorimotor.Neither']
-	fields['Abs-Conc.LSN-Perc.Neither._orig'] = origfields['LSN.Perceptual.Neither']
-	# filter
-	fields2incl = [
-		field for field in fields
-		if (not fieldprefix or field.startswith(fieldprefix)) and (not fieldsuffix or field.endswith(fieldsuffix)) 
-	]
-	fields2excl = [field for field in fields if field not in set(fields2incl)]
-	for field in fields2excl: del fields[field]
-	for field in fields2incl:
-		fields[field]=set(fields[field])-stopwords
-	FIELDS=fields
-	print('done.',time.time()-now)
-	return fields
 
 
 
@@ -72,7 +14,7 @@ def get_stopwords(lower=True):
 	for path in paths:
 		with open(path) as f:
 			words=f.read().strip().split('\n')
-			stopwords|=set((w.lower() if lower else w) for w in words)
+			stopwords|=set((w.strip().lower() if lower else w.strip()) for w in words if w.strip())
 	return stopwords
 
 
@@ -82,40 +24,6 @@ def get_stopwords(lower=True):
 ###
 # loading models
 ###
-
-def load_vecdf(vec,period=None):
-    if not period: period='_median'
-    path=f'{VECDB_DIR}/{vec}/{period}.csv'
-    if os.path.exists(path):
-        df=pd.read_csv(path).dropna()
-        df['csim']=1-df['cdist']
-        df['csim_z']=zscore(df.csim) #.apply(zscore,1)
-        return df
-
-
-def get_wordnorms_vec():
-	"""
-	@TODO: Loads vector norms (word csim's) for multiple vectors from vecdb
-	"""
-	pass
-
-
-
-def get_wordnorms_orig():
-	"""
-	@TODO: Loads norms for words from original fields (QLD in SemantiFields ipynb)
-	"""
-	pass
-
-
-
-
-
-
-
-
-
-
 
 
 

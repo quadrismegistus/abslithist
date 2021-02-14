@@ -24,10 +24,13 @@ def download_tqdm(url, save_to):
 
 
 
+def periodize(y):
+    y=int(y)
+    if bin_year_by==100:
+        return f'C{(y//100) + 1}'
+    else:
+        return y//bin_year_by * bin_year_by
 
-"""
-Simple mofo'n parallelism with progress bar. Born of frustration with p_tqdm.
-"""
 
 
 def display_source(code):
@@ -70,9 +73,10 @@ def pmap_iter(func, objs, num_proc=4, use_threads=False, progress=True, desc=Non
 	from tqdm import tqdm
 	
 	# if parallel
-	if num_proc>1:
+	if desc: desc=f'{desc} [x{num_proc}]'
+	if num_proc>1 and len(objs)>1:
 		# create pool
-		pool=mp.Pool(num_proc) if not use_threads else mp.ThreadPool(num_proc)
+		pool=mp.Pool(num_proc) if not use_threads else mp.pool.ThreadPool(num_proc)
 
 		# yield iter
 		iterr = pool.imap_unordered(func, objs)
@@ -80,7 +84,7 @@ def pmap_iter(func, objs, num_proc=4, use_threads=False, progress=True, desc=Non
 			yield res
 	else:
 		# yield
-		for obj in tqdm(objs) if progress else objs:
+		for obj in tqdm(objs,desc=desc) if progress else objs:
 			yield func(obj)
 
 def pmap(*x,**y):

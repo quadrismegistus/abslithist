@@ -2,12 +2,12 @@ import os,sys; sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__f
 from abslithist import *
 
 import gensim
-from scipy.spatial.distance import cosine
+from fastdist import fastdist
 
 
 
 
-def get_model_paths(model_dir=PATH_MODELS,model_fn='model.txt.gz',vocab_fn='vocab.txt'):
+def get_model_paths(model_dir=PATH_MODELS,model_fn='model.txt.gz',vocab_fn='vocab.txt',period_len=None):
     """
     Get all models' paths
     """
@@ -26,6 +26,8 @@ def get_model_paths(model_dir=PATH_MODELS,model_fn='model.txt.gz',vocab_fn='voca
                 'path_vocab':os.path.join(root,vocab_fn)
             }
             if run is not None: dx['run']=run
+            if period_len and int(dx['period_end'])-int(dx['period_start'])!=period_len:
+                continue
             ld.append(dx)
     return ld
 
@@ -83,37 +85,43 @@ def compute_vecfields():
 
 
 
-# # This function computes all contast and vectors
-# def compute_field_vectors(model, fields, incl_non_contrasts=False, incl_contrasts=True):
-#     """
-#     Compute field vectors in a model
-#     """
-    
-#     ### LOAD
-#     # create dictionary from field -> vecs
-#     field2vec={}
-#     # First get non-contrasts
-#     if incl_non_contrasts:
-#         for field,words in fields.items():
-#             field2vec[field]=compute_vector(model,words)
-#     # Then get contrasts
-#     if incl_contrasts:
-#         contrast_methods = {
-#             tuple(fieldname.split('.')[:2]) for fieldname in fields
-#             if '-' in fieldname.split('.')[0]
-#         }
-#         for contrast,method in contrast_methods:
-#             contrast_pos,contrast_neg=contrast.split('-')
-#             key_pos = f'{contrast}.{method}.{contrast_pos}'
-#             key_neg = f'{contrast}.{method}.{contrast_neg}'
-#             key_neither = f'{contrast}.{method}.Neither'
-#             if key_pos in fields and key_neg in fields:
-#                 field2vec[f'{contrast}.{method}']=compute_vector(model,fields[key_pos],fields[key_neg])
-#                 #if key_neg in fields:
-#                 #    field2vec[f'{contrast_pos}-Neither.{method}']=compute_vector(model,fields[key_pos],fields[key_neither])
-#                 #    field2vec[f'{contrast_neg}-Neither.{method}']=compute_vector(model,fields[key_neg],fields[key_neither])
+# This function computes all contast and vectors
+def get_fieldvecs_in_model(model,fields={},contrasts=[]):
+    """
+    Compute field vectors in a model
+    """
+    ### LOAD
+    field2vec={}
 
-#     return field2vec
+    for field in fields:
+        field2vec[field]=compute_vector(model,fields[field])
+
+    for cdx in contrasts:
+        contrast=cdx['contrast']
+        method=cdx['method']
+        poswords=cdx['pos']
+        negwords=cdx['neg']
+        field2vec[f'{contrast}.{method}']=compute_vector(model,poswords,negwords)
+
+    return field2vec
+
+
+def compute_vec2vec_dists(x2vec,y2vec,xname='x',yname='y',distfunc='cosine'):
+    func=getattr(fastdist,distfunc)
+    ld=[]
+    for x in x2vec:
+        for y in y2vec:
+            dx={
+                xname:x,
+                yname:y,
+                'dist':func(
+                    np.array(x2vec[x]),
+                    np.array(y2vec[y])
+                )
+            }
+            ld.append(dx)
+    df=pd.DataFrame(ld).pivot(xname,yname,'dist')
+    return df
 
 
 

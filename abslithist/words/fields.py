@@ -1,16 +1,6 @@
 import os,sys; sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),'..','..'))
 from abslithist import *
-SOURCE_DIR=os.path.join(PATH_DATA,'fields','sources')
-FIELD_DIR=os.path.join(PATH_DATA,'fields')
-MODEL_DIR=os.path.join(PATH_DATA,'models')
-PATH_FIELDS_JSON = os.path.join(FIELD_DIR,'data.fields_orig.json')
-PATH_VECFIELDS_JSON = os.path.join(FIELD_DIR,'data.fields_vec.json')
-PATH_FIELD2VEC_PKL = os.path.join(FIELD_DIR,'data.models.word_and_field_vecs.pkl')
-PATH_NORMS = os.path.join(FIELD_DIR,'data.wordnorms_orig.csv')
-VECNORMS_FN='data.wordnorms_vec.csv'
-PATH_VECNORMS = os.path.join(FIELD_DIR,VECNORMS_FN)
-if not os.path.exists(SOURCE_DIR): os.makedirs(SOURCE_DIR)
-ZCUT = ZCUT_NORMS_ORIG
+
 
 ### Funcs
 # split semantic axis into high and low fields
@@ -212,26 +202,43 @@ def gen_orignorms():
 # Norms -> Fields
 #
 
-def get_fields_from_norms(path_norms,zcut=ZCUT,name_neither='Neither'):
-    dfnorms=pd.read_csv(path_norms)
+def get_fields_from_norms(dfnorms,zcut=ZCUT,name_neither='Neither',reverse=False,remove_stopwords=True):
     fields=dict()
+    # if reverse: zcut=zcut*-1
     for source,sourcedf in dfnorms.groupby('source'):
         if not '.' in source: continue
         contrast,method=source.split('.')
         if not '-' in contrast: continue
         pos,neg=contrast.split('-')
-        fields[f'{contrast}.{method}.{pos}']=poswords=set(sourcedf[sourcedf.z<=-zcut].word)
-        fields[f'{contrast}.{method}.{neg}']=negwords=set(sourcedf[sourcedf.z>=zcut].word)
+        fields[f'{contrast}.{method}.{pos}']=poswords=set(sourcedf[sourcedf.z>=zcut if not reverse else sourcedf.z<=-zcut].word)
+        fields[f'{contrast}.{method}.{neg}']=negwords=set(sourcedf[sourcedf.z<=-zcut if not reverse else sourcedf.z>=zcut].word)
         fields[f'{contrast}.{method}.{name_neither}'] = set(sourcedf.word) - poswords - negwords
+    
     for field in fields:
         fields[field]={w for w in fields[field] if type(w)==str}
+
+    if remove_stopwords:
+        from abslithist.words import get_stopwords
+        stopwords = get_stopwords()
+        for field in fields:
+            # print(f'removing {len(fields[field]&stopwords)} stopwords from {field}')
+            fields[field]-=stopwords
+
     return fields
 
 
 def get_origfields():
-    return get_fields_from_norms(PATH_NORMS)
+    dfnorms=pd.read_csv(PATH_NORMS)
+    return get_fields_from_norms(dfnorms)
+
 def get_vecfields():
-    return get_fields_from_norms
+    dfnorms=pd.read_csv(PATH_VECNORMS)
+    fields={}
+    for period,perioddf in dfnorms.groupby('period'):
+        period_fields=get_fields_from_norms(perioddf)
+        for field,words in period_fields.items():
+            fields[f'{field}.{period}']=words
+    return fields
 
 def get_fields():
     fields={}
@@ -307,8 +314,95 @@ def get_veccontrasts():
 # VECTOR FIELDS
 #
 
+def dist2norms(df):
+    norms=[]
+    for col in df.columns:
+        # add to norms
+        add_series_to_norms(
+            df[col],
+            source=col,
+            norms=norms,
+        )
+    return norms
 
-def gen_vecnorms
+def gen_vecnorms_for_model(model_path):
+    # load model
+    import gensim
+    from abslithist.models.embeddings import load_model, get_fieldvecs_in_model, compute_vec2vec_dists
+    
+    model = load_model(model_path)
+    word2vec = dict((w,model[w]) for w in model.vocab)
+
+    # field vectors
+    field2vec = get_fieldvecs_in_model(
+        model,
+        # fields = get_origfields(),
+        contrasts=get_origcontrasts()
+    )
+
+    # dist table
+    dfdist = compute_vec2vec_dists(word2vec,field2vec,xname='word',yname='field')
+
+    # normalize
+    return dist2norms(dfdist)
+
+
+def gen_vecnorms_for_paths(paths,desc=None):
+    norms = [
+        normd
+        for normld in pmap(
+            gen_vecnorms_for_model,
+            paths,
+            num_proc=2,
+            desc=desc,
+            use_threads=False
+        ) for normd in normld
+    ]
+    dfnorms=pd.DataFrame(norms).groupby(['word','source']).median().reset_index()
+    return dfnorms
+
+
+def gen_vecnorms(bin_year_by=100):
+    """
+    Aggregate model-periods' vecnorms by century/yearbin
+    """
+    from abslithist.models.embeddings import get_model_paths
+
+    def periodize(y):
+        y=int(y)
+        if bin_year_by==100:
+            return f'C{(y//100) + 1}'
+        else:
+            return y//bin_year_by * bin_year_by
+
+    # group by paths    
+    paths_ld = get_model_paths()
+    paths_df = pd.DataFrame(paths_ld)
+    paths_df['period'] = paths_df['period_start'].apply(periodize)
+    # print(len(paths_df))
+
+    ## agg by period
+    alldf=pd.DataFrame()
+    for period,perioddf in sorted(paths_df.groupby('period')):
+        # print(period,len(perioddf))
+        # continue
+        newdf=pd.DataFrame()
+        for (corpus,period_start,period_end),cppdf in sorted(perioddf.groupby(['corpus','period_start','period_end'])):
+            # print(period,corpus,period_start,period_end)
+            newdf=newdf.append(
+                gen_vecnorms_for_paths(
+                    cppdf.path,
+                    desc=f'Computing norms for {period} ({corpus}, {period_start}-{period_end})'
+                )
+            )
+            # break
+        newdf=newdf.groupby(['word','source']).median().reset_index()
+        newdf['period']=period
+        alldf=alldf.append(newdf)
+        # break
+    alldf.to_csv(PATH_VECNORMS,index=False)
+
+
 
 
 
@@ -318,20 +412,6 @@ def gen_vecnorms
 
 ### VEC FIELDS
 
-# This function computes all contast and vectors
-def compute_fieldvecs_in_model(model):#, incl_non_contrasts=False, incl_contrasts=True):
-    """
-    Compute field vectors in a model
-    """
-    ### LOAD
-    contrasts_ld = get_origcontrasts()
-    for cdx in contrast_methods:
-        contrast=cdx['contrast']
-        method=cdx['method']
-        poswords=cdx['pos']
-        negwords=cdx['neg']
-        field2vec[f'{contrast}.{method}']=compute_vector(model,poswords,negwords)
-    return field2vec
 
 
 
@@ -348,51 +428,48 @@ def compute_fieldvecs_in_model(model):#, incl_non_contrasts=False, incl_contrast
 
 
 
+# def _calc_norms_dist_group(obj):
+#     path_ld_group=obj
+#     fields=get_origfields()
 
+#     # get fn
+#     pathd=path_ld_group[0]
+#     ofn_norms=os.path.join(PATH_MODELS,pathd['corpus'],pathd['period_start']+'-'+pathd['period_end'],VECNORMS_FN)
+#     if os.path.exists(ofn_norms): return
 
-
-def _calc_norms_dist_group(obj):
-    path_ld_group=obj
-    fields=get_origfields()
-
-    # get fn
-    pathd=path_ld_group[0]
-    ofn_norms=os.path.join(PATH_MODELS,pathd['corpus'],pathd['period_start']+'-'+pathd['period_end'],VECNORMS_FN)
-    if os.path.exists(ofn_norms): return
-
-    # loop
-    norms=[]
-    for pathd in path_ld_group:
-        path=pathd['path']
-        df=pd.read_csv(path).set_index('word')
-        for col in df.columns:
-            # add to norms
-            add_series_to_norms(
-                df[col],
-                source=col,
-                norms=norms,
-            )
-            # add to fields
-    dfnorms=pd.DataFrame(norms).groupby(['word','source']).median().reset_index()
-    dfnorms.to_csv(ofn_norms,index=False)       
+#     # loop
+#     norms=[]
+#     for pathd in path_ld_group:
+#         path=pathd['path']
+#         df=pd.read_csv(path).set_index('word')
+#         for col in df.columns:
+#             # add to norms
+#             add_series_to_norms(
+#                 df[col],
+#                 source=col,
+#                 norms=norms,
+#             )
+#             # add to fields
+#     dfnorms=pd.DataFrame(norms).groupby(['word','source']).median().reset_index()
+#     dfnorms.to_csv(ofn_norms,index=False)       
     
 
-def gen_vecnorms():
-    # paths
-    from abslithist.models.embeddings import get_model_paths
-    paths_ld = get_model_paths(model_fn='word2field_dists.csv')
-    paths_df = pd.DataFrame(paths_ld)
+# def gen_vecnorms():
+#     # paths
+#     from abslithist.models.embeddings import get_model_paths
+#     paths_ld = get_model_paths(model_fn='word2field_dists.csv')
+#     paths_df = pd.DataFrame(paths_ld)
 
-    # get fields
-    # fields = get_origfields()
+#     # get fields
+#     # fields = get_origfields()
 
-    # group runs
-    groups=[
-        group_df.to_dict('records')
-        for gi,group_df in paths_df.groupby(['corpus','period_start','period_end'])
-    ]
+#     # group runs
+#     groups=[
+#         group_df.to_dict('records')
+#         for gi,group_df in paths_df.groupby(['corpus','period_start','period_end'])
+#     ]
 
-    pmap(_calc_norms_dist_group,groups,desc='Generating norms across model-periods',num_proc=1)
+#     pmap(_calc_norms_dist_group,groups,desc='Generating norms across model-periods',num_proc=1)
         
 
 def agg_vecnorms(bin_year_by=100):

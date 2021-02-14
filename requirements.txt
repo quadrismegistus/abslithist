@@ -1,0 +1,6 @@
+pandas
+numpy
+scipy
+numba
+fastdist
+tabula-py

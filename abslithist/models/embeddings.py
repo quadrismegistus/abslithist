@@ -176,3 +176,67 @@ def compute_word2field_dists(obj,force=False):
 # Generating models
 #######
 
+
+# STONE
+
+def _do_gen_model(obj):
+    ifn,ofnfn,ofnfn_vocab,attrs=obj
+    # Load skips
+    skips = gensim.models.word2vec.LineSentence(ifn)
+    # Gen model
+	# model = gensim.models.Word2Vec(skips, workers=num_workers, sg=sg, min_count=min_count, size=num_dimensions, window=skipgram_size)
+    model = gensim.models.Word2Vec(skips, **attrs)
+    
+    # Save model
+    model.wv.save_word2vec_format(ofnfn, ofnfn_vocab)
+
+
+def gen_model(
+        path_to_skipgram_file,
+        skipgram_size=10,
+        num_runs=1,
+        num_skips_wanted=None,
+        num_workers=8,
+        min_count=10,
+        num_dimensions=100,
+        sg=1,
+        num_epochs=None,
+        labels=[],
+        num_proc=1
+        ):
+    import gensim,logging
+    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+
+    # Load skipgrams
+    # skips = gensim.models.word2vec.LineSentence(path_to_skipgram_file)
+
+    objs=[]
+    for run in range(num_runs):
+        # Output filename
+        odir=os.path.join(os.path.dirname(path_to_skipgram_file),f'run_{str(run+1).zfill(2)}')
+        if not os.path.exists(odir): os.makedirs(odir)
+        ofnfn=os.path.join(odir,'model.txt.gz')
+        if os.path.exists(ofnfn): continue
+        ofnfn_vocab=os.path.join(odir,'vocab.txt')
+
+        obj = (
+            path_to_skipgram_file,
+            ofnfn,
+            ofnfn_vocab,
+            dict(
+                 workers=num_workers,
+                 sg=sg,
+                 min_count=min_count,
+                 size=num_dimensions,
+                 window=skipgram_size
+            )
+        )
+        objs.append(obj)
+    
+    pmap(_do_gen_model, objs, num_proc=num_proc)
+
+def gen_models(
+        folder_of_skipgram_files,
+        **attrs
+        ):
+    pass

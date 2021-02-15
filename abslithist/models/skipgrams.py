@@ -55,6 +55,7 @@ def save_skipgrams_corpus(C_lltk,period_len=50,min_year=None,max_year=None,num_p
     if min_year: df=df[df.year>=min_year]
     if max_year: df=df[df.year<max_year]
         
+    # prepare
     objs = [
         (
             [C.textd[idx].path_txt for idx in perioddf.id],
@@ -62,7 +63,11 @@ def save_skipgrams_corpus(C_lltk,period_len=50,min_year=None,max_year=None,num_p
         )
         for period,perioddf in sorted(df.groupby('period'))
     ]
+
+    # remove already done
+    objs = [(paths,ofn) for paths,ofn in objs if not os.path.exists(ofn)]
         
+    # exec
     pmap(
         _do_save_skipgrams_corpus,
         objs,

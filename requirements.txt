@@ -4,3 +4,4 @@ scipy
 numba
 fastdist
 tabula-py
+gensim

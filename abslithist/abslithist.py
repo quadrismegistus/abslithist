@@ -4,7 +4,7 @@ from tqdm import tqdm
 from collections import defaultdict
 import requests,json,pandas as pd,numpy as np,pickle
 import shutil,zipfile,random
-import warnings
+import warnings,gzip
 warnings.filterwarnings('ignore')
 
 PATH_HERE = os.path.dirname(os.path.realpath(__file__))

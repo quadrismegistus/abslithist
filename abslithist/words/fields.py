@@ -353,7 +353,7 @@ def gen_vecnorms_for_paths(paths,desc=None):
         for normld in pmap(
             gen_vecnorms_for_model,
             paths,
-            num_proc=2,
+            num_proc=1,
             desc=desc,
             use_threads=False
         ) for normd in normld
@@ -362,7 +362,7 @@ def gen_vecnorms_for_paths(paths,desc=None):
     return dfnorms
 
 
-def gen_vecnorms(bin_year_by=100):
+def gen_vecnorms(bin_year_by=50):
     """
     Aggregate model-periods' vecnorms by century/yearbin
     """
@@ -372,6 +372,8 @@ def gen_vecnorms(bin_year_by=100):
         y=int(y)
         if bin_year_by==100:
             return f'C{(y//100) + 1}'
+        elif bin_year_by==50:
+            return f'C{(y//100) + 1}{"e" if int(str(y)[2])<5 else "l"}'
         else:
             return y//bin_year_by * bin_year_by
 
@@ -386,21 +388,26 @@ def gen_vecnorms(bin_year_by=100):
     for period,perioddf in sorted(paths_df.groupby('period')):
         # print(period,len(perioddf))
         # continue
-        newdf=pd.DataFrame()
-        for (corpus,period_start,period_end),cppdf in sorted(perioddf.groupby(['corpus','period_start','period_end'])):
-            # print(period,corpus,period_start,period_end)
-            newdf=newdf.append(
-                gen_vecnorms_for_paths(
-                    cppdf.path,
-                    desc=f'Computing norms for {period} ({corpus}, {period_start}-{period_end})'
+        ofn_period=os.path.splitext(PATH_VECNORMS)[0]+'.'+period+'.csv'
+        if not os.path.exists(ofn_period):
+            newdf=pd.DataFrame()
+            for (corpus,period_start,period_end),cppdf in sorted(perioddf.groupby(['corpus','period_start','period_end'])):
+                # print(period,corpus,period_start,period_end)
+                newdf=newdf.append(
+                    gen_vecnorms_for_paths(
+                        cppdf.path,
+                        desc=f'Computing norms for {period} ({corpus}, {period_start}-{period_end})'
+                    )
                 )
-            )
-            # break
-        newdf=newdf.groupby(['word','source']).median().reset_index()
+                # break
+            newdf=newdf.groupby(['word','source']).median().reset_index()
+            newdf.to_csv(ofn_period,index=False)
+        else:
+            newdf=pd.read_csv(ofn_period)
         newdf['period']=period
-        alldf=alldf.append(newdf)
+        # alldf=alldf.append(newdf)
         # break
-    alldf.to_csv(PATH_VECNORMS,index=False)
+    # alldf.to_csv(PATH_VECNORMS,index=False)
 
 
 

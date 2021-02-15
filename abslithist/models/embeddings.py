@@ -111,14 +111,17 @@ def compute_vec2vec_dists(x2vec,y2vec,xname='x',yname='y',distfunc='cosine'):
     ld=[]
     for x in x2vec:
         for y in y2vec:
-            dx={
-                xname:x,
-                yname:y,
-                'dist':func(
-                    np.array(x2vec[x]),
-                    np.array(y2vec[y])
-                )
-            }
+            try:
+                dx={
+                    xname:x,
+                    yname:y,
+                    'dist':func(
+                        np.array(x2vec[x]),
+                        np.array(y2vec[y])
+                    )
+                }
+            except Exception:
+                continue
             ld.append(dx)
     df=pd.DataFrame(ld).pivot(xname,yname,'dist')
     return df
@@ -164,3 +167,12 @@ def compute_word2field_dists(obj,force=False):
     df['word_rank']=[model.vocab[w].index for w in df.index]
     # save
     df.sort_values('word_rank').to_csv(ofn_data)
+
+
+
+
+
+#######
+# Generating models
+#######
+

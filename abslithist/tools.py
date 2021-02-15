@@ -1,10 +1,10 @@
 from scipy.stats import zscore
-import pandas as pd
+import pandas as pd,re
 
 def zfy(series):
-    series=pd.to_numeric(series,errors='coerce').dropna()
-    series_z=pd.Series(zscore(series),index=series.index)
-    return series_z
+	series=pd.to_numeric(series,errors='coerce').dropna()
+	series_z=pd.Series(zscore(series),index=series.index)
+	return series_z
 
 def download_tqdm(url, save_to):
 	import requests
@@ -25,11 +25,11 @@ def download_tqdm(url, save_to):
 
 
 def periodize(y):
-    y=int(y)
-    if bin_year_by==100:
-        return f'C{(y//100) + 1}'
-    else:
-        return y//bin_year_by * bin_year_by
+	y=int(y)
+	if bin_year_by==100:
+		return f'C{(y//100) + 1}'
+	else:
+		return y//bin_year_by * bin_year_by
 
 
 
@@ -59,6 +59,58 @@ def source(x):
 		x=inspect.getsource(x)
 	display(display_source(x))
 
+
+### TOKENIZER
+
+SENTENCE_TOKENIZER=None
+
+def get_sentence_tokenizer():
+    global SENTENCE_TOKENIZER
+    if SENTENCE_TOKENIZER is None:
+        import stanza
+        SENTENCE_TOKENIZER = stanza.Pipeline(lang='en', processors='tokenize')
+    return SENTENCE_TOKENIZER
+
+def tokenize_sentences_nlp(txt):
+    nlp = get_sentence_tokenizer()
+    return [
+        #[token.text for token in sentence.tokens]
+        sentence.text
+		for sentence in nlp(txt).sentences
+    ]
+
+def tokenize_sentences(txt):
+	import nltk
+	return nltk.sent_tokenize(txt)
+
+
+def tokenize(txt,lower=True):
+	replacements = {
+		0x2013: ' -- ',
+		0x2014: ' -- ',
+		0x201c: '"',
+		0x201d: '"',
+		0x2018: "'",
+		0x2019: "'",
+		0x2026: ' ... ',
+		0xa0: ' '
+	}
+	for r in replacements:
+		txt = txt.replace(chr(r), replacements[r])
+	return tokenize_fast(txt)
+
+def tokenize_fast(line,lower=True):
+	import re
+	from string import punctuation
+	line=line.lower() if lower else line
+	tokens = re.findall(
+		r"[A-Z]{2,}(?![a-z])|[A-Z][a-z]+(?=[A-Z])|[\'\w\-]+",
+		# r'\w+',
+		line
+	)
+	tokens = [w.strip(punctuation) for w in tokens]
+	tokens = [w for w in tokens if w]
+	return tokens
 
 def pmap_iter(func, objs, num_proc=4, use_threads=False, progress=True, desc=None):
 	"""

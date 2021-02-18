@@ -1,5 +1,6 @@
 from scipy.stats import zscore
 import pandas as pd,re
+import nltk
 
 def zfy(series):
 	series=pd.to_numeric(series,errors='coerce').dropna()
@@ -62,55 +63,6 @@ def source(x):
 
 ### TOKENIZER
 
-SENTENCE_TOKENIZER=None
-
-def get_sentence_tokenizer():
-    global SENTENCE_TOKENIZER
-    if SENTENCE_TOKENIZER is None:
-        import stanza
-        SENTENCE_TOKENIZER = stanza.Pipeline(lang='en', processors='tokenize')
-    return SENTENCE_TOKENIZER
-
-def tokenize_sentences_nlp(txt):
-    nlp = get_sentence_tokenizer()
-    return [
-        #[token.text for token in sentence.tokens]
-        sentence.text
-		for sentence in nlp(txt).sentences
-    ]
-
-def tokenize_sentences(txt):
-	import nltk
-	return nltk.sent_tokenize(txt)
-
-
-def tokenize(txt,lower=True):
-	replacements = {
-		0x2013: ' -- ',
-		0x2014: ' -- ',
-		0x201c: '"',
-		0x201d: '"',
-		0x2018: "'",
-		0x2019: "'",
-		0x2026: ' ... ',
-		0xa0: ' '
-	}
-	for r in replacements:
-		txt = txt.replace(chr(r), replacements[r])
-	return tokenize_fast(txt)
-
-def tokenize_fast(line,lower=True):
-	import re
-	from string import punctuation
-	line=line.lower() if lower else line
-	tokens = re.findall(
-		r"[A-Z]{2,}(?![a-z])|[A-Z][a-z]+(?=[A-Z])|[\'\w\-]+",
-		# r'\w+',
-		line
-	)
-	tokens = [w.strip(punctuation) for w in tokens]
-	tokens = [w for w in tokens if w]
-	return tokens
 
 def pmap_iter(func, objs, num_proc=4, use_threads=False, progress=True, desc=None):
 	"""
@@ -121,13 +73,13 @@ def pmap_iter(func, objs, num_proc=4, use_threads=False, progress=True, desc=Non
 	"""
 	
 	# imports
-	import multiprocessing as mp
 	from tqdm import tqdm
 	
 	# if parallel
 	if desc: desc=f'{desc} [x{num_proc}]'
 	if num_proc>1 and len(objs)>1:
 		# create pool
+		import multiprocessing as mp
 		pool=mp.Pool(num_proc) if not use_threads else mp.pool.ThreadPool(num_proc)
 
 		# yield iter
@@ -136,7 +88,7 @@ def pmap_iter(func, objs, num_proc=4, use_threads=False, progress=True, desc=Non
 			yield res
 	else:
 		# yield
-		for obj in tqdm(objs,desc=desc) if progress else objs:
+		for obj in (tqdm(objs,desc=desc) if progress else objs):
 			yield func(obj)
 
 def pmap(*x,**y):
@@ -145,3 +97,54 @@ def pmap(*x,**y):
 	"""
 	# return as list
 	return list(pmap_iter(*x,**y))
+
+
+### utils
+def printm(x):
+	from IPython.display import display,Markdown
+	display(Markdown(x))
+
+
+def writegen(fnfn,generator,header=None,args=[],kwargs={},find_all_keys=False,total=None,delimiter=','):
+	from tqdm import tqdm
+	import csv
+	
+	if not header:
+		iterator=generator(*args,**kwargs)
+		if not find_all_keys:
+			first=next(iterator)
+			header=sorted(first.keys())
+		else:
+			print('>> finding keys:')
+			keys=set()
+			for dx in iterator:
+				keys|=set(dx.keys())
+			header=sorted(list(keys))
+			print('>> found:',len(header),'keys')
+	
+	iterator=generator(*args,**kwargs)
+	if total: iterator=tqdm(iterator,total=total)
+
+
+	with open(fnfn, 'w') as csvfile:
+		writer = csv.DictWriter(csvfile,fieldnames=header,extrasaction='ignore',delimiter=delimiter)
+		writer.writeheader()
+		for i,dx in enumerate(iterator):
+			#for k,v in dx.items():
+			#	dx[k] = str(v).replace('\r\n',' ').replace('\r',' ').replace('\n',' ').replace('\t',' ')
+			writer.writerow(dx)
+	print('>> saved:',fnfn)
+
+
+def get_slices(l,num_slices=None,slice_length=None,runts=True,random=False):
+	"""
+	Returns a new list of n evenly-sized segments of the original list
+	"""
+	if random:
+		import random
+		random.shuffle(l)
+	if not num_slices and not slice_length: return l
+	if not slice_length: slice_length=int(len(l)/num_slices)
+	newlist=[l[i:i+slice_length] for i in range(0, len(l), slice_length)]
+	if runts: return newlist
+	return [lx for lx in newlist if len(lx)==slice_length]

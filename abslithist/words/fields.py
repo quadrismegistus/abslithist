@@ -1,22 +1,14 @@
 import os,sys; sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),'..','..'))
 from abslithist import *
+from abslithist.words import *
+
+SOURCES = ['PAV-Conc','MRC-Conc','MT-Conc','PAV-Imag','MRC-Imag','LSN-Imag','LSN-Perc','LSN-Sens','Median']
+BAD_SOURCES = {'LSN-Perc','LSN-Sens'}
+
 
 
 ### Funcs
 # split semantic axis into high and low fields
-def split_spectrum_into_fields(series):
-    series_z=zfy(series)
-    top = set(series_z[series_z>=ZCUT].index)
-    bottom = set(series_z[series_z<=-ZCUT].index)
-    middle = set(series_z.index) - top - bottom
-    return (bottom,middle,top)
-
-def add_series_to_fields(series,fields,method,contrast='Abs-Conc',contrast_vals=['Abs','Neither','Conc'],suffix=''):
-    (
-        fields[f'{contrast}.{method}.{contrast_vals[0]}{suffix}'],
-        fields[f'{contrast}.{method}.{contrast_vals[1]}{suffix}'],
-        fields[f'{contrast}.{method}.{contrast_vals[2]}{suffix}']
-    ) = split_spectrum_into_fields(series)
 
 # # Save zdata
 def add_series_to_norms(series,source,norms,series_std={},**attrs):
@@ -24,6 +16,7 @@ def add_series_to_norms(series,source,norms,series_std={},**attrs):
     done=set()
     #for v,z,w in zip(series,seriesz,series.index):
     for w,z in zip(seriesz.index,seriesz):
+        if type(w)!=str or not w or not w[0].isalpha(): continue
         wdx={
             'word':w,
             'score':series[w],
@@ -55,8 +48,6 @@ def gen_norms_paivio(norms,prefix='PAV'):
     add_series_to_norms(series=df_paivio.CONC_M,source='Abs-Conc.PAV-Conc',norms=norms,series_std=df_paivio.CONC_SD)
     add_series_to_norms(series=df_paivio.IMAG_M,source='Abs-Conc.PAV-Imag',norms=norms,series_std=df_paivio.IMAG_SD)
     # add to fields
-    #add_series_to_fields(series=df_paivio.CONC_M,fields=fields,method='PAV-Conc')
-    #add_series_to_fields(series=df_paivio.IMAG_M,fields=fields,method='PAV-Imag')
 
 def gen_norms_mrc(norms,prefix='MRC'):
     # urls and paths
@@ -127,11 +118,6 @@ def gen_norms_mrc(norms,prefix='MRC'):
     add_series_to_norms(series=mrc_df['CONC'], source='Abs-Conc.MRC-Conc', norms=norms)
     add_series_to_norms(series=mrc_df['IMAG'], source='Abs-Conc.MRC-Imag', norms=norms)
 
-    # add fields
-    # add_series_to_fields(series=mrc_df.CONC,fields=fields,method='MRC-Conc')
-    # add_series_to_fields(series=mrc_df.IMAG,fields=fields,method='MRC-Imag')
-    # add_series_to_fields(series=mrc_df.AOA,fields=fields,method='MRC-AOA',contrast='Early-Late',contrast_vals=['Early','Neither','Late'])
-
 
 ## Brysbaert et al
 def gen_norms_brys(norms,prefix='MT'):
@@ -145,11 +131,8 @@ def gen_norms_brys(norms,prefix='MT'):
     df_brys = pd.read_csv(mturk_path,sep='\t').set_index('Word')
     # filter for 1grams
     df_brys['word']=df_brys.index
-    df_brys=df_brys[df_brys.word.apply(lambda x: type(x)==str and ' ' not in x)]
-    # add series
+    df_brys=df_brys[df_brys.word.apply(lambda x: type(x)==str and x and ' ' not in x)]
     add_series_to_norms(series=df_brys['Conc.M'], source='Abs-Conc.MT-Conc', norms=norms, series_std=df_brys['Conc.SD'])
-    # add fields
-    #add_series_to_fields(series=df_brys['Conc.M'],fields=fields,method='MT-Conc')
 
 def gen_norms_lsn(norms):
     # paths
@@ -163,15 +146,11 @@ def gen_norms_lsn(norms):
     df_lsn=df_lsn[~df_lsn.Word.str.contains(' ')]
     df_lsn=df_lsn.set_index('Word')
     # add norms
-    add_series_to_norms(series=df_lsn['Minkowski3.perceptual'], source='Abs-Conc.LSN-Perc', norms=norms)
-    add_series_to_norms(series=df_lsn['Minkowski3.sensorimotor'], source='Abs-Conc.LSN-Sens', norms=norms)
-    # add_series_to_norms(series=df_lsn['Minkowski3.action'], source='Abs-Conc.LSN-Act', norms=norms)
+    # add_series_to_norms(series=df_lsn['Minkowski3.perceptual'], source='Abs-Conc.LSN-Perc', norms=norms)
+    # add_series_to_norms(series=df_lsn['Minkowski3.sensorimotor'], source='Abs-Conc.LSN-Sens', norms=norms)
     add_series_to_norms(series=df_lsn['Visual.mean'], source='Abs-Conc.LSN-Imag', norms=norms)
-    # add to fields
-    # add_series_to_fields(df_lsn['Visual.mean'],fields=fields,method='LSN-Imag')
-    # add_series_to_fields(df_lsn['Minkowski3.perceptual'],fields=fields,method='LSN-Perc')
-    # add_series_to_fields(df_lsn['Minkowski3.action'],fields=fields,method='LSN-Act')
-    # add_series_to_fields(df_lsn['Minkowski3.sensorimotor'],fields=fields,method='LSN-Sens')
+    add_series_to_norms(series=df_lsn['Haptic.mean'], source='Abs-Conc.LSN-Hapt', norms=norms)
+    # add_series_to_norms(series=df_lsn['Auditory.mean'], source='Abs-Conc.LSN-Aud', norms=norms)
 
 
 def gen_orignorms():
@@ -194,61 +173,58 @@ def gen_orignorms():
     # save norms
     qdf=pd.DataFrame(norms)
     qdf=qdf.drop_duplicates(['word','source'],keep='first')
-    qdf.to_csv(PATH_NORMS,index=False)
+    qdf=qdf.pivot('word','source','z')   # new!
+    qdf.to_csv(PATH_NORMS)#,index=False)
     
+def filter_norms(df,remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
+    return df if not remove_stopwords else df.loc[[w for w in df.index if w not in get_stopwords()]]
+
+def get_orignorms(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
+    df=pd.read_csv(PATH_NORMS).set_index('word')
+    df=filter_norms(df,remove_stopwords=remove_stopwords)
+    # add median?
+    df['Abs-Conc.Median'] = df.median(axis=1)
+    return df
+
 
 
 #################
 # Norms -> Fields
-#
+##
 
-def get_fields_from_norms(dfnorms,zcut=ZCUT,name_neither='Neither',reverse=False,remove_stopwords=True):
+
+def get_fields_from_norms(dfnorms,zcut=ZCUT,neither='Neither',reverse=False,remove_stopwords=True):
     fields=dict()
-    # if reverse: zcut=zcut*-1
-    for source,sourcedf in dfnorms.groupby('source'):
-        if not '.' in source: continue
-        contrast,method=source.split('.')
-        if not '-' in contrast: continue
-        pos,neg=contrast.split('-')
-        fields[f'{contrast}.{method}.{pos}']=poswords=set(sourcedf[sourcedf.z>=zcut if not reverse else sourcedf.z<=-zcut].word)
-        fields[f'{contrast}.{method}.{neg}']=negwords=set(sourcedf[sourcedf.z<=-zcut if not reverse else sourcedf.z>=zcut].word)
-        fields[f'{contrast}.{method}.{name_neither}'] = set(sourcedf.word) - poswords - negwords
-    
-    for field in fields:
-        fields[field]={w for w in fields[field] if type(w)==str}
 
     if remove_stopwords:
         from abslithist.words import get_stopwords
-        stopwords = get_stopwords()
-        for field in fields:
-            # print(f'removing {len(fields[field]&stopwords)} stopwords from {field}')
-            fields[field]-=stopwords
+        dfnorms=dfnorms.loc[set(dfnorms.index)-get_stopwords()]
+    
+    contrasts = get_contrasts(dfnorms,zcut=zcut,reverse=reverse)
+    for cdx in contrasts:
+        neg,pos=cdx['contrast'].split('-')
+        period='.'+cdx['period'] if cdx['period'] else ''
+        fields[f"{cdx['contrast']}.{cdx['source']}.{neg}{period}"]=cdx['neg']
+        fields[f"{cdx['contrast']}.{cdx['source']}.{pos}{period}"]=cdx['pos']
+        fields[f"{cdx['contrast']}.{cdx['source']}.{neither}{period}"]=cdx['neither']
 
     return fields
 
-
 def get_origfields():
-    dfnorms=pd.read_csv(PATH_NORMS)
+    dfnorms=get_orignorms()
     return get_fields_from_norms(dfnorms)
 
 def get_vecfields():
-    dfnorms=pd.read_csv(PATH_VECNORMS)
-    fields={}
-    for period,perioddf in dfnorms.groupby('period'):
-        period_fields=get_fields_from_norms(perioddf)
-        for field,words in period_fields.items():
-            fields[f'{field}.{period}']=words
-    return fields
+    dfnorms=get_vecnorms()
+    return get_fields_from_norms(dfnorms)
 
 def get_fields():
     fields={}
-    for field,words in get_origfields():
-        fields[field+'._orig']=words
-    for field,words in get_vecfields():
+    for field,words in get_origfields().items():
+        fields[field+'.orig']=words
+    for field,words in get_vecfields().items():
         fields[field]=words
     return fields
-def get_vecnorms():
-    return pd.read_csv(PATH_VECNORMS)
 
 def sample(l,n=10):
     wordstr=', '.join([str(w) for w in (l if len(l)<n else random.sample(l,n))])
@@ -265,49 +241,115 @@ def show_fields(fields):
     pd.options.display.max_colwidth=100
     return pd.DataFrame(ld).set_index('field').sort_values('num',ascending=False)
 
-def format_contrasts(fields,neither='Neither',show_sample=False,sample_n=10):
-    contrasts = {x.split('.')[0] for x in fields}
-    methods = {x.split('.')[1] for x in fields}
-    periods = {'.'+x.split('.')[3] if x.count('.')>2 else ''for x in fields}
 
-    ld=[]
 
-    for contrast in contrasts:
-        pos,neg=contrast.split('-')
-        for method in methods:
-            for period in periods:
-                poskey=f'{contrast}.{method}.{pos}{period}'
-                negkey=f'{contrast}.{method}.{neg}{period}'
-                neitherkey=f'{contrast}.{method}.{neither}{period}'
-                if poskey not in fields or negkey not in fields or neitherkey not in fields:
-                    continue
-                dx={
-                    'contrast':contrast,
-                    'method':method,
-                    'neg':fields[negkey] if not show_sample else sample(fields[negkey]),
-                    'pos':fields[poskey] if not show_sample else sample(fields[poskey]),
-                    'neither':fields[neitherkey] if not show_sample else sample(fields[neitherkey]),
-                }
-                ld.append(dx)
-    return ld
-
-def show_contrasts(fields):
-    pd.options.display.max_colwidth=50
-    df=pd.DataFrame(format_contrasts(fields,show_sample=True)).sort_values(['contrast','method'])
-    return df.set_index(['contrast','method'])
+def show_contrasts(contrasts,sample_n=5,colwidth=50,numrows=100):
+    pd.options.display.max_colwidth=colwidth
+    pd.options.display.max_rows=numrows
+    for dx in contrasts:
+        for k in ['pos','neg','neither']:
+            dx[k]=sample(dx[k],n=sample_n)
+    df=pd.DataFrame(contrasts).sort_values(['contrast','source','period'])
+    return df.set_index(['contrast','source','period']).fillna('')
     
 
-def get_contrasts(fields):
-    return format_contrasts(fields)
+def get_contrasts(dfnorms,neither='Neither',reverse=False,zcut=ZCUT):
+    ld=[]
+    for col in dfnorms.columns:
+        colparts=col.split('.')
+        contrast=colparts[0]
+        source=colparts[1]
+        period=colparts[2] if len(colparts)>2 else 'orig'
+        neg,pos=contrast.split('-')
+        
+        series=dfnorms[col]
+        # print(series.loc['virtue'])
+        poswords=set(series[series>=zcut if not reverse else series<=(zcut*-1)].index)
+        negwords=set(series[series<=(zcut*-1) if not reverse else series>=zcut].index)
+        neitherwords = set(series.dropna().index) - poswords - negwords
 
-def get_origcontrasts():
-    return get_contrasts(get_origfields())
 
-def get_veccontrasts():
-    return get_contrasts(get_vecfields())
+        dx={
+            'contrast':contrast,
+            'source':source,
+            'period':period,
+            'neg':negwords, #if not show_sample else sample(fields[negkey]),
+            'pos':poswords, #if not show_sample else sample(fields[poskey]),
+            'neither':neitherwords,# if not show_sample else sample(fields[neitherkey]),
+        }
+        ld.append(dx)
+    
+    return ld
 
 
+def get_origcontrasts(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
+    return get_contrasts(get_orignorms(remove_stopwords=remove_stopwords))
 
+def get_veccontrasts(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
+    return get_contrasts(get_vecnorms(remove_stopwords=remove_stopwords))
+
+def get_allcontrasts(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS,cached=True,cachefn='data/fields/data.cache.allcontrasts.pkl'):
+    #if cached and os.path.exists(cachefn):
+    #    with open(cachefn,'rb') as f: return pickle.load(f)
+    # get otherwise
+    ld=get_contrasts(get_allnorms(remove_stopwords=remove_stopwords))
+    # save?
+    #if cached:
+    #    with open(cachefn,'wb') as of: pickle.dump(ld,of)
+    return ld
+
+def decideifabs(x,zcut=ZCUT,reverse=False):
+    if x>=zcut: return 'Concrete' if not reverse else 'Abstract'
+    if x<=(zcut*-1): return 'Abstract' if not reverse else 'Concrete'
+    return 'Neither'
+
+def format_norms_as_long(dfnorms,zcut=ZCUT):
+    ld=[]
+    for col in dfnorms.columns:
+        colparts=col.split('.')
+        contrast=colparts[0]
+        source=colparts[1]
+        source_type='Conc' if source.split('-')[-1]=='Conc' else 'Imag'
+        period=colparts[2] if len(colparts)>2 else ''
+        source=f'{source}.{period}' if period else source
+        neg,pos=contrast.split('-')
+        
+        series=dfnorms[col].dropna()
+
+        for word,z in zip(series.index, series):
+            dx={
+                'word':word,
+                'z':z,
+                'source':source,
+                'source_type':source_type,
+                'decision':decideifabs(z),
+                'order':SOURCES.index(source) if source in SOURCES else 0
+            }
+            # if period: dx['period']=period
+            ld.append(dx)
+    return pd.DataFrame(ld).sort_values('z')
+    
+
+
+def get_allnorms(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
+    # orig
+    dfnorms_orig = get_orignorms(remove_stopwords=remove_stopwords)
+    dfnorms_orig.columns = [c+'.orig' for c in dfnorms_orig.columns]
+    
+    # vecs
+    dfnorms_vec = get_vecnorms(add_median=True,remove_stopwords=remove_stopwords)
+    
+    # join
+    return dfnorms_vec.join(dfnorms_orig,how='outer')
+
+def show_origcontrasts(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
+    return show_contrasts(get_origcontrasts(remove_stopwords=remove_stopwords))
+
+def show_veccontrasts(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
+    return show_contrasts(get_veccontrasts(remove_stopwords=remove_stopwords))
+
+def show_allcontrasts(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
+    return show_contrasts(get_allcontrasts(remove_stopwords=remove_stopwords))
 
 
 ###############
@@ -325,18 +367,17 @@ def dist2norms(df):
         )
     return norms
 
-def gen_vecnorms_for_model(model_path):
+def gen_vecnorms_for_model(pathd):
     # load model
     import gensim
     from abslithist.models.embeddings import load_model, get_fieldvecs_in_model, compute_vec2vec_dists
-    
-    model = load_model(model_path)
-    word2vec = dict((w,model[w]) for w in model.vocab)
+    model = load_model(pathd.get('path'),pathd.get('path_vocab'),min_count=MIN_COUNT_MODEL)
+    word2vec = dict((w,model[w]) for w in model.wv.vocab)# if model.vocab[w].count>=MIN_COUNT_MODEL)
 
     # field vectors
     field2vec = get_fieldvecs_in_model(
         model,
-        # fields = get_origfields(),
+        # fields = get_origfields(),   # not getting vectors for non-contrasts for now
         contrasts=get_origcontrasts()
     )
 
@@ -347,13 +388,13 @@ def gen_vecnorms_for_model(model_path):
     return dist2norms(dfdist)
 
 
-def gen_vecnorms_for_paths(paths,desc=None):
+def gen_vecnorms_for_paths(paths,desc=None,num_proc=1):
     norms = [
         normd
         for normld in pmap(
             gen_vecnorms_for_model,
             paths,
-            num_proc=1,
+            num_proc=num_proc,
             desc=desc,
             use_threads=False
         ) for normd in normld
@@ -362,7 +403,9 @@ def gen_vecnorms_for_paths(paths,desc=None):
     return dfnorms
 
 
-def gen_vecnorms(bin_year_by=50):
+
+
+def gen_vecnorms(bin_year_by=MODEL_PERIOD_LEN,num_runs=None,num_proc=1):
     """
     Aggregate model-periods' vecnorms by century/yearbin
     """
@@ -384,136 +427,173 @@ def gen_vecnorms(bin_year_by=50):
     # print(len(paths_df))
 
     ## agg by period
-    alldf=pd.DataFrame()
+    # alldf=pd.DataFrame()
+    word2field2z=defaultdict(dict)
     for period,perioddf in sorted(paths_df.groupby('period')):
-        # print(period,len(perioddf))
-        # continue
-        ofn_period=os.path.splitext(PATH_VECNORMS)[0]+'.'+period+'.csv'
+        ofn_period=os.path.splitext(PATH_VECNORMS)[0]+'.'+period+'.csv.gz'
         if not os.path.exists(ofn_period):
             newdf=pd.DataFrame()
             for (corpus,period_start,period_end),cppdf in sorted(perioddf.groupby(['corpus','period_start','period_end'])):
                 # print(period,corpus,period_start,period_end)
-                newdf=newdf.append(
-                    gen_vecnorms_for_paths(
-                        cppdf.path,
-                        desc=f'Computing norms for {period} ({corpus}, {period_start}-{period_end})'
-                    )
+                # newdf=newdf.append(
+                corpusdf=gen_vecnorms_for_paths(
+                        cppdf.sort_values('path').to_dict('records')[:num_runs],
+                        desc=f'Computing norms for {period} ({corpus}, {period_start}-{period_end})',
+                        num_proc=num_proc
                 )
+                corpusdf['corpus']=corpus
                 # break
+                newdf=newdf.append(corpusdf)
+            newdf=newdf.groupby(['word','source','corpus']).median().reset_index()
             newdf=newdf.groupby(['word','source']).median().reset_index()
-            newdf.to_csv(ofn_period,index=False)
-        else:
-            newdf=pd.read_csv(ofn_period)
-        newdf['period']=period
-        # alldf=alldf.append(newdf)
+            for word,field,z in zip(newdf.word, newdf.source, newdf.z):
+                if not word or not word[0].isalpha(): continue
+                newfield=field+'.'+period
+                word2field2z[word][newfield]=z
         # break
-    # alldf.to_csv(PATH_VECNORMS,index=False)
+
+    ld = [
+        {
+            **{'word':word},
+            **word2field2z[word]
+        } for word in word2field2z
+    ]
+    df=pd.DataFrame(ld).set_index('word')
+    df.to_csv(PATH_VECNORMS)
 
 
+def get_vecnorms_fns(periods=None):
+    l=[]
+    for fn in sorted(os.listdir(FIELD_DIR)):
+        if not fn.startswith(VECNORMS_FN_PRE): continue
+        period=fn.replace('.gz','').replace('.csv','').split('.')[-1]
+        if periods and period not in periods: continue
+        l.append((period,os.path.join(FIELD_DIR,fn)))
+    return l
 
-
-
-
-
-
-
-### VEC FIELDS
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# def _calc_norms_dist_group(obj):
-#     path_ld_group=obj
-#     fields=get_origfields()
-
-#     # get fn
-#     pathd=path_ld_group[0]
-#     ofn_norms=os.path.join(PATH_MODELS,pathd['corpus'],pathd['period_start']+'-'+pathd['period_end'],VECNORMS_FN)
-#     if os.path.exists(ofn_norms): return
-
-#     # loop
-#     norms=[]
-#     for pathd in path_ld_group:
-#         path=pathd['path']
-#         df=pd.read_csv(path).set_index('word')
-#         for col in df.columns:
-#             # add to norms
-#             add_series_to_norms(
-#                 df[col],
-#                 source=col,
-#                 norms=norms,
-#             )
-#             # add to fields
-#     dfnorms=pd.DataFrame(norms).groupby(['word','source']).median().reset_index()
-#     dfnorms.to_csv(ofn_norms,index=False)       
+def get_vecnorms(periods=None,add_median=True,remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
+    df=pd.read_csv(PATH_VECNORMS).set_index('word')
+    df=filter_norms(df,remove_stopwords=remove_stopwords)
     
+    colgroups=defaultdict(set)
+    for col in df.columns:
+        if col.count('.')!=2: continue
+        contrast,source,period=col.split('.')#[-1]
+        colgroups[contrast+'.'+source]|={col}
+    
+    for contrastsource,pcols in colgroups.items():
+        dfp = df[pcols].median(axis=1)
+        newcolname=contrastsource+'.median'
+        df[newcolname]=dfp
+    
+    return df
 
-# def gen_vecnorms():
-#     # paths
-#     from abslithist.models.embeddings import get_model_paths
-#     paths_ld = get_model_paths(model_fn='word2field_dists.csv')
-#     paths_df = pd.DataFrame(paths_ld)
 
-#     # get fields
-#     # fields = get_origfields()
+    # periods = set(col.split('.')[-1] for col in df.columns if col.count('.')>1)
+    # for period in periods:
+    #     pcols=[col for col ]
 
-#     # group runs
-#     groups=[
-#         group_df.to_dict('records')
-#         for gi,group_df in paths_df.groupby(['corpus','period_start','period_end'])
-#     ]
+    
+    # for period,fnfn in get_vecnorms_fns(periods=periods):
+    #     df=pd.read_csv(fnfn)
 
-#     pmap(_calc_norms_dist_group,groups,desc='Generating norms across model-periods',num_proc=1)
+    #     # HACK!! THIS WAS OWING TO CHANGE IN norms->fields function in between generating data. fix!
+    #     if period.startswith('C16'):
+    #         df['score']*=-1
+    #         df['z']*=-1
         
+    #     yield (period,df)
 
-def agg_vecnorms(bin_year_by=100):
-    """
-    Aggregate model-periods' vecnorms by century/yearbin
-    """
-    from abslithist.models.embeddings import get_model_paths
-
-    def periodize(y):
-        y=int(y)
-        if bin_year_by==100:
-            return f'C{(y//100) + 1}'
-        else:
-            return y//bin_year_by * bin_year_by
-
+# def gen_vecfields(periods=None):
+#     fields={}
+#     total=len(get_vecnorms_fns(periods=periods))
+#     for period,perioddf in tqdm(get_vecnorms(),total=total,desc='Splitting into fields'):
+#         period_fields=get_fields_from_norms(perioddf)
+#         for field,words in sorted(period_fields.items()):
+#             newfield=f'{field}.{period}'
+#             print(newfield,len(words),random.sample(words,5))
+#             fields[newfield]=words
     
-    paths_ld = get_model_paths(model_fn=VECNORMS_FN)
-    paths_df = pd.DataFrame(paths_ld)
-    paths_df['yearbin'] = paths_df['period_start'].apply(periodize)
-
-    ## agg by period
-    alldf=pd.DataFrame()
-    for period,perioddf in tqdm(list(paths_df.groupby('yearbin'))):
-        newdf=pd.DataFrame()
-        for path in perioddf.path:
-            pathdf=pd.read_csv(path)
-            newdf=newdf.append(pathdf)
-        newdf=newdf.groupby(['word','source']).median().reset_index()
-        newdf['period']=period
-        alldf=alldf.append(newdf)
-    alldf.to_csv(PATH_VECNORMS,index=False)
+#     # save
+#     with open(PATH_VECFIELDS_PKL,'wb') as of:
+#         pickle.dump(fields,of)
 
 
+def gen_vecfields(periods=None):
+    word2field=defaultdict(dict)
+    total=len(get_vecnorms_fns(periods=periods))
+    for period,perioddf in tqdm(get_vecnorms(),total=total,desc='Splitting into fields'):
+        period_fields=get_fields_from_norms(perioddf,remove_stopwords=False)
+        for field,words in sorted(period_fields.items()):
+            newfield=f'{field}.{period}'
+            print(newfield,len(words),random.sample(words,5))
+            #fields[newfield]=words
+            for word in words:
+                word2field[word][newfield]='y'
+        # break
+    
+    ld = [
+        {
+            **{'word':word},
+            **word2field[word]
+        } for word in word2field
+    ]
+    df=pd.DataFrame(ld).set_index('word')
+    df.to_csv(PATH_VECFIELDS)
 
 
 
 
-if __name__=='__main__':
-    #gen_fields_and_norms()
-    gen_vecfields(compute=False)
+#### Stats
+
+def corr_norms(dfnorms):
+    from scipy.stats import pearsonr
+    def pearsonr_pval(x,y): return pearsonr(x,y)[1]
+    pd.options.display.max_rows=10
+    cordf_r=dfnorms.corr()
+    cordf_p=dfnorms.corr(method=pearsonr_pval)
+    cordf_r_melt=cordf_r.reset_index().melt('index').set_index(['index','variable'])
+    cordf_p_melt=cordf_p.reset_index().melt('index').set_index(['index','variable'])
+    cordf=cordf_r_melt.join(cordf_p_melt,rsuffix='_p')
+    cordf=cordf.reset_index()
+    cordf=cordf[cordf['index']<cordf['variable']]#.set_index(['inde'])
+    cordf=cordf.sort_values('value')
+    print('Minimum:',cordf['value'].min())
+    print('Median:',cordf['value'].median())
+    print('Maximum:',cordf['value'].max())
+    return cordf
+
+# def corr_norms2(dfnorms):
+#     from scipy.stats import pearsonr
+#     pd.options.display.max_rows=10
+
+#     ld=[]
+#     return dfnorms
+#     for col1 in dfnorms.columns:
+#         for col2 in dfnorms.columns:
+#             if col1>=col2: continue
+#             s1=dfnorms[col1].replace([np.inf, -np.inf], np.nan).dropna()
+#             s2=dfnorms[col2].replace([np.inf, -np.inf], np.nan).dropna()
+#             shared=set(s1.index)&set(s2.index)
+#             # print(s1.loc[shared],s2.loc[shared])
+#             s1x=s1.loc[shared]
+#             s2x=s2.loc[shared]
+#             #print(set(s2x.index)-set(s1x.index))
+#             #print(col1,col2,len(s1),len(s2),len(shared),len(s1x),len(s2x))#,shared)
+
+#             try:
+#                 r,p=pearsonr(s1x.values,s2x.values)
+#             except ValueError:
+#                 continue
+#             dx={'col1':col1,'col2':col2,'r':r,'p':p,'n':len(shared)}
+#             ld.append(dx)
+#     cordf=pd.DataFrame(ld)
+#     print('Minimum:',cordf['r'].min())
+#     print('Median:',cordf['r'].median())
+#     print('Maximum:',cordf['r'].max())
+#     return cordf.sort_values('r')
+
+
+def corr_orignorms(): return corr_norms(get_orignorms())
+def corr_vecnorms(): return corr_norms(get_vecnorms())
+def corr_allnorms(): return corr_norms(get_allnorms())

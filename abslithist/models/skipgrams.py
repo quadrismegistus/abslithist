@@ -1,5 +1,6 @@
 import os,sys; sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),'..','..'))
 from abslithist import *
+from abslithist.words import *
 
 BY_SENTENCE=True
 
@@ -17,7 +18,7 @@ def yield_skipgrams_from_text(txt,skipgram_size=10,lowercase=True):
 def yield_sentences_from_text(txt,skipgram_size=10,lowercase=True):
     skipgram=[]
     for sent in tokenize_sentences(txt):
-        skipgram+=tokenize(sent)
+        skipgram+=[w for w in tokenize(sent.lower()) if w and w[0].isalpha()]
         if len(skipgram)>=skipgram_size:
             yield skipgram
             skipgram=[]
@@ -99,6 +100,12 @@ def gen_skipgrams_corpus(cname,period_len=MODEL_PERIOD_LEN,min_year=None,max_yea
     pmap(
         _do_save_skipgrams_corpus,
         objs,
-        num_proc=num_proc
+        num_proc=num_proc,
+        desc='Tokenizing and yielding sentences'
     )
     
+
+def gen_all_skipgrams(force=False,num_proc=1):
+    gen_skipgrams_corpus('eebo_tcp',min_year=1500,max_year=1700,force=force,num_proc=num_proc)
+    gen_skipgrams_corpus('ecco_tcp',min_year=1700,max_year=1800,force=force,num_proc=num_proc)
+    gen_skipgrams_corpus('coha',min_year=1800,max_year=2000,force=force,num_proc=num_proc)

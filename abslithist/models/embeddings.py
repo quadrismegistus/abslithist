@@ -297,3 +297,50 @@ def gen_models_corpus(cname,period_len=MODEL_PERIOD_LEN,**attrs):
     ])
     
     return gen_models(skipgrams,**attrs)
+
+def gen_all_models(num_runs=10,num_proc=4):
+    gen_models_corpus('eebo_tcp',num_runs=num_runs,num_proc=num_proc)
+    gen_models_corpus('ecco_tcp',num_runs=num_runs,num_proc=num_proc)
+    gen_models_corpus('coha',num_runs=num_runs,num_proc=num_proc)
+
+
+####
+# DISTS
+####
+
+def gen_top_words_across_models(words,ofn='data.top_words.json',num_proc=1,min_count=None,top_n=10):
+    paths = get_model_paths()
+    def _writegen():
+        for gen in pmap_iter(
+            _do_gen_top_words_across_models,
+            [
+                (words,pathd,min_count,top_n)
+                for pathd in paths
+            ],
+            num_proc=num_proc,
+            desc='Collecting top word associations across all models',
+            progress=True
+        ):
+            for dx in gen:
+                yield dx
+    writegen_jsonl(os.path.join(DIST_DIR,ofn), _writegen)
+
+def _do_gen_top_words_across_models(obj):
+    words,pathd,min_count,top_n = obj
+    modelmetad=dict((k,v) for k,v in pathd.items() if not k.startswith('path'))
+    model = load_model(pathd['path'])
+    vocab = model.vocab if hasattr(model,'vocab') else model.wv.vocab
+    words = [w for w in words if w in vocab]
+    if min_count: words = [w for w in words if vocab[w].count<min_count]
+    res=[]
+    # for word in tqdm(words,desc='Getting neighborhoods within model'):
+    for word in words:
+        top = model.wv.most_similar(word,topn=top_n)
+        if top:
+            dat = {'word':word, 'neighborhood':top, **modelmetad}
+            res.append(dat)
+            # yield dat
+    return res
+
+
+#### sem net?

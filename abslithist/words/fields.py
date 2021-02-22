@@ -218,13 +218,8 @@ def get_vecfields():
     dfnorms=get_vecnorms()
     return get_fields_from_norms(dfnorms)
 
-def get_fields():
-    fields={}
-    for field,words in get_origfields().items():
-        fields[field+'.orig']=words
-    for field,words in get_vecfields().items():
-        fields[field]=words
-    return fields
+def get_allfields():
+    return get_fields_from_norms(get_allnorms())
 
 def sample(l,n=10):
     wordstr=', '.join([str(w) for w in (l if len(l)<n else random.sample(l,n))])

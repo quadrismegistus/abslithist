@@ -5,3 +5,4 @@ numba
 fastdist
 tabula-py
 gensim
+plotnine

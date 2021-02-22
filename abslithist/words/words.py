@@ -5,6 +5,32 @@ from abslithist import *
 STOPWORDS=None
 SPELLING_D=None
 
+REPLACEMENTS={
+	'&hyphen;':'-',
+	'&sblank;':'--',
+	'&mdash;':' -- ',
+	'&ndash;':' - ',
+	'&longs;':'s',
+	'|':'',
+	'&ldquo;':u'“',
+	'&rdquo;':u'”',
+	'&lsquo;':u'‘’',
+	'&rsquo;':u'’',
+	'&indent;':'     ',
+	'&amp;':'&',
+}
+REPLACEMENTS_b = {
+	0x2013: ' -- ',
+	0x2014: ' -- ',
+	0x201c: '"',
+	0x201d: '"',
+	0x2018: "'",
+	0x2019: "'",
+	0x2026: ' ... ',
+	0xa0: ' '
+}
+
+
 def get_stopwords(lower=True):
 	global STOPWORDS
 	if not STOPWORDS:
@@ -18,6 +44,7 @@ def get_stopwords(lower=True):
 			with open(path) as f:
 				words=f.read().strip().split('\n')
 				stopwords|=set((w.strip().lower() if lower else w.strip()) for w in words if w.strip())
+			# print(path,len(stopwords))
 		STOPWORDS=stopwords
 	return STOPWORDS
 
@@ -60,26 +87,41 @@ def tokenize_sentences(txt):
 	import nltk
 	return nltk.sent_tokenize(txt)
 
+def gleanPunc2(aToken):
+	aPunct0 = ''
+	aPunct1 = ''
+	while(len(aToken) > 0 and not aToken[0].isalnum()):
+		aPunct0 = aPunct0+aToken[:1]
+		aToken = aToken[1:]
+	while(len(aToken) > 0 and not aToken[-1].isalnum()):
+		aPunct1 = aToken[-1]+aPunct1
+		aToken = aToken[:-1]
+
+	return (aPunct0, aToken, aPunct1)
+
+def modernize_spelling_in_txt(txt,spelling_d):
+	lines=[]
+	for ln in txt.split('\n'):
+		ln2=[]
+		for tok in ln.split(' '):
+			p1,tok,p2=gleanPunc2(tok)
+			tok=spelling_d.get(tok,tok)
+			ln2+=[p1+tok+p2]
+		ln2=' '.join(ln2)
+		lines+=[ln2]
+	return '\n'.join(lines)
 
 
 def tokenize(txt,lower=True,modernize=False):
-	replacements = {
-		0x2013: ' -- ',
-		0x2014: ' -- ',
-		0x201c: '"',
-		0x201d: '"',
-		0x2018: "'",
-		0x2019: "'",
-		0x2026: ' ... ',
-		0xa0: ' '
-	}
-	for r in replacements:
-		txt = txt.replace(chr(r), replacements[r])
-	
-	words = nltk.word_tokenize(txt)
+	# clean
+	for k,v in REPLACEMENTS_b.items(): txt = txt.replace(chr(k), v)
+	for k,v in REPLACEMENTS.items(): txt = txt.replace(k, v)
+	# modernize?
 	if modernize:
 		spellingd=get_spelling_modernizer()
-		words = [spellingd.get(w,w) for w in words]
+		txt=modernize_spelling_in_txt(txt,spellingd)
+	# tokenize
+	words = nltk.word_tokenize(txt)
 	return words
 
 def tokenize_fast(line,lower=True):

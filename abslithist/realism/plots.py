@@ -3,7 +3,7 @@ from abslithist import *
 from abslithist.words import *
 
 JITTER=0
-VERSION='v32'
+VERSION='v36'
 
 factor=2.5
 cutoff=1600
@@ -44,7 +44,8 @@ shapes =  {'Allegory': 'd',
 
 valtype2label={
     # 'abs/conc':'<< Concrete words | Abstract words >>',
-    'abs-conc':'# Abstract words - # Concrete words (per 1000 words)',
+    'abs-conc':'<< More concrete words | More abstract words >>   ',
+    # 'abs-conc':'# Abstract words - # Concrete words (averaged across all 100-word passages)',
     'abs/conc':'Frequency of abstract words per 1 concrete word',
     'abs':'% Abstract Words',
     'conc':'% Concrete Words',
@@ -77,7 +78,8 @@ def load_data_for_plotting(cname='CanonFiction',sources=SOURCES_FOR_PLOTTING,per
     # countdat
     #cdf=pd.read_csv(f'data/counts/data.absconc.{cname}.csv')#.set_index('id').dropna()
     #cdf.to_feather(f'data/counts/data.absconc.{cname}.ft')
-    cdf=pd.read_feather(f'data/counts/data.absconc.{cname}.ft')
+    cdf=pd.read_feather(f'data/counts/data.absconc.{cname}.v6.csv.ft')
+    # cdf=pd.read_csv(f'{COUNT_DIR}/data.absconc.{cname}.psgs.v7.csv.gz')
     if sources: cdf=cdf[cdf.source.isin(sources)]
     if periods: cdf=cdf[cdf.period.isin(periods)]
     cdf['abs/conc']=cdf['num_abs']/cdf['num_conc']
@@ -99,7 +101,8 @@ def load_data_for_plotting(cname='CanonFiction',sources=SOURCES_FOR_PLOTTING,per
     alldf=alldf[(alldf['canon_genre']!="") | (alldf['corpus_source']!="")]
     alldf.loc[alldf['canon_genre'].str.strip()=="", "major_genre"]="Unknown"
 
-    dfplot=alldf.groupby(['major_genre','canon_genre','author']).median().reset_index().sort_values('abs/conc')
+    dfplot=alldf.groupby(['major_genre','canon_genre','author']).mean().reset_index().sort_values('abs/conc')
+    # dfplot=alldf.groupby(['major_genre','canon_genre','author']).median().reset_index().sort_values('abs/conc')
 
     return dfplot
 
@@ -154,6 +157,8 @@ def plot_fiction(
         df['value'] = df['abs/conc'] #df['num_abs'] / df['num_conc']
     elif valtype=='abs-conc':
         df['value'] = df['num_abs']-df['num_conc'] #df['num_abs'] / df['num_conc']
+    elif valtype=='abs+conc':
+        df['value'] = df['num_abs']+df['num_conc'] #df['num_abs'] / df['num_conc']
     elif valtype=='abs':
         df['value'] = df['perc_abs']*100 #df['num_abs'] / df['num_all'] * 100
     elif valtype=='conc':
@@ -206,6 +211,13 @@ def plot_fiction(
     fig = p9.ggplot(df,aesth)
 #     fig+=p9.annotation_stripes(direction='horizontal',fill=['#e3e3e3','#f0f0f0'])
     fig+=p9.theme_classic() 
+#     fig+=p9.theme(
+# #         text=element_text(fontproperties=body_text),
+#         axis_title_x=p9.element_text(family='monospace'),
+#         axis_title_y=p9.element_text(family='monospace'),
+#         axis_text_x=p9.element_text(family='monospace'),
+#         axis_text_y=p9.element_text(family='monospace')
+#     )
     fig+=p9.scale_color_manual(colors,show_legend=True,guide='legend')
     fig+=p9.scale_shape_manual(shapes,show_legend=True,guide='legend')
     fig+=p9.scale_x_continuous(
@@ -228,13 +240,13 @@ def plot_fiction(
     medianval=df['value'].median()
     stdval=df['value'].std()
     if not standardize:
-        fig+=p9.scale_y_continuous(breaks=list(range(0,100,10)))
+        fig+=p9.scale_y_continuous(breaks=list(range(0,100,10)),limits=(min_y,max_y))
         if valtype=='abs/conc':
             fig+=p9.geom_hline(yintercept = 1, show_legend=False,color='gray')
         elif valtype=='abs-conc':
             fig+=p9.geom_hline(yintercept=0,show_legend=False,color='gray')
         else:
-            fig+=geom_hline(yintercept = medianval, show_legend=False, color='gray')
+            fig+=p9.geom_hline(yintercept = medianval, show_legend=False, color='gray')
             pass
         if (minval is not None and maxval is not None):
             fig+=p9.ylim(minval,maxval)
@@ -243,7 +255,7 @@ def plot_fiction(
         fig+=p9.geom_hline(yintercept = 0.0, show_legend=False)
         
     if dotsize:
-        fig+=p9.geom_point(alpha=0.8,size=2,data=df)#b3b3b3')#,show_legend=False)
+        fig+=p9.geom_point(alpha=0.5,size=2,data=df)#b3b3b3')#,show_legend=False)
     
     # labels
     ylabel=valtype2label.get(valtype,valtype)
@@ -263,10 +275,12 @@ def plot_fiction(
             dfl,dfh = dfq[~dfq[label_by].isin(highlights)],dfq[dfq[label_by].isin(highlights)]
         else:
             dfl,dfh = dfq,None
-        if not jitter:
-            fig+=p9.geom_text(p9.aes(**aesd),inherit_aes=False,data=dfl)#,adjust_text=adjust_text_dict)
-        else:
-            fig+=p9.geom_text(p9.aes(**aesd),inherit_aes=False,adjust_text=adjust_text_dict,data=dfl)    
+        fig+=p9.geom_text(
+            p9.aes(**aesd),
+            inherit_aes=False,
+            data=dfl,
+            adjust_text=adjust_text_dict if jitter else None,
+        )
         if dfh is not None:
             fig+=p9.geom_text(p9.aes(**aesd),fontweight='bold',color='black',data=dfh)
     
@@ -285,7 +299,8 @@ def plot_fiction(
 #             fig+=scale_y_continuous(breaks=list(range(0,105,5)))
             fig+=p9.scale_y_continuous(breaks=[0,10,20,30,40,50,60,70,80,90,100])
         elif valtype=='abs-conc':
-            fig+=p9.scale_y_continuous(breaks=[-400,-300,-200,-100,0,100,200,300,400])
+            fig+=p9.scale_y_continuous(breaks=[-50,-40,-30,-20,-10,0,10,20,30,40,50],limits=[min_y-2,max_y+2])
+            # fig+=p9.scale_y_continuous(breaks=[-400,-300,-200,-100,0,100,200,300,400])
         else:
             fig+=p9.scale_y_continuous()
 
@@ -326,11 +341,10 @@ def plot_fiction(
 
 def do_plot_fiction(df=None,**x):
     if df is None: df=load_data_for_plotting()
-    print('>> Plotting...')
     args={
         **dict(
             valtype='abs/conc',
-            title='Prevalence of abstract vs. concrete words across history of fictional canon',
+            title='# Abstract words - # Concrete words, averaged across all passages containing 100 recognized words',
             jitter=0,
             standardize=False,
             log_y=False,
@@ -342,7 +356,6 @@ def do_plot_fiction(df=None,**x):
         **x
     }
     return plot_fiction(df,**args)
-
 
 if __name__=='__main__':
     print('>> Loading data')

@@ -117,6 +117,7 @@ def tokenize(txt,lower=True,modernize=False):
 	for k,v in REPLACEMENTS_b.items(): txt = txt.replace(chr(k), v)
 	for k,v in REPLACEMENTS.items(): txt = txt.replace(k, v)
 	# modernize?
+	txt=txt.lower() if lower else txt
 	if modernize:
 		spellingd=get_spelling_modernizer()
 		txt=modernize_spelling_in_txt(txt,spellingd)

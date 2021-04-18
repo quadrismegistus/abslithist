@@ -3,7 +3,11 @@ from abslithist import *
 from abslithist.words import *
 
 SOURCES = ['PAV-Conc','MRC-Conc','MT-Conc','PAV-Imag','MRC-Imag','LSN-Imag','LSN-Perc','LSN-Sens','Median']
+<<<<<<< HEAD
+BAD_SOURCES = {}#'LSN-Perc','LSN-Sens'}
+=======
 BAD_SOURCES = {'LSN-Perc','LSN-Sens'}
+>>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
 
 
 
@@ -221,6 +225,22 @@ def get_vecfields():
 def get_allfields():
     return get_fields_from_norms(get_allnorms())
 
+<<<<<<< HEAD
+def get_fields(): return get_allfields()
+
+def get_absconc():
+    fields = get_allfields()
+    return {
+        'abs':fields.get(DEFAULT_ABS_FIELD),
+        'conc':fields.get(DEFAULT_CONC_FIELD),
+        'neither':fields.get(DEFAULT_NEITHER_FIELD),
+    }
+
+
+
+
+=======
+>>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
 def sample(l,n=10):
     wordstr=', '.join([str(w) for w in (l if len(l)<n else random.sample(l,n))])
     return f'{wordstr} ... ({len(l)})'
@@ -276,6 +296,35 @@ def get_contrasts(dfnorms,neither='Neither',reverse=False,zcut=ZCUT):
     
     return ld
 
+<<<<<<< HEAD
+def get_misccontrasts():
+    ld=[]
+    ld+=[{
+        'contrast':'Woman-Man',
+        'source':'SingleWords',
+        'period':'na',
+        'neg':{'man'},
+        'pos':{'woman'},
+        'neither':{}
+    }]
+    ld+=[{
+        'contrast':'Woman-Man',
+        'source':'MultiWords',
+        'period':'na',
+        'neg':{'man','boy','brother','father','husband','son'},
+        'pos':{'woman','girl','sister','mother','wife','daughter'},
+        'neither':{}
+    }]
+    return ld
+
+
+def get_subcontrasts(remove=REMOVE_STOPWORDS_IN_WORDNORMS, include_misc=True):
+    ld=get_origcontrasts()
+    if include_misc: ld+=get_misccontrasts()
+    return ld
+
+=======
+>>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
 
 def get_origcontrasts(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
     return get_contrasts(get_orignorms(remove_stopwords=remove_stopwords))
@@ -315,8 +364,14 @@ def format_norms_as_long(dfnorms,zcut=ZCUT):
             dx={
                 'word':word,
                 'z':z,
+<<<<<<< HEAD
+                'source':source.split('.')[0],
+                'period':source.split('.')[1],
+                # 'source_type':source_type,
+=======
                 'source':source,
                 'source_type':source_type,
+>>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
                 'decision':decideifabs(z),
                 'order':SOURCES.index(source) if source in SOURCES else 0
             }
@@ -373,7 +428,11 @@ def gen_vecnorms_for_model(pathd):
     field2vec = get_fieldvecs_in_model(
         model,
         # fields = get_origfields(),   # not getting vectors for non-contrasts for now
+<<<<<<< HEAD
+        contrasts=get_subcontrasts()
+=======
         contrasts=get_origcontrasts()
+>>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
     )
 
     # dist table

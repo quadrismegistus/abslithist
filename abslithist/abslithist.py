@@ -18,7 +18,7 @@ import lltk
 import mpi_slingshot as sl
 import tempfile
 from scipy.stats import percentileofscore
-
+from yapmap import *
 
 
 PATH_HERE = os.path.dirname(os.path.realpath(__file__))
@@ -82,27 +82,5 @@ PATH_PSG_SCORE=os.path.join(PATH_SCORES,'bypsg3.pkl')
 PATH_PSG_IMGS=os.path.join(PATH_SCORES,'bypsg2_smpl_img3')
 
 
-# ### Initial setuop
-# import mapply
-
-# mapply.init(
-#     n_workers=4,
-#     chunk_size=100,
-#     max_chunks_per_worker=8,
-#     progressbar=True
-# )
-
-
-
 C=lltk.load(DEFAULT_CORPUS)
 C.au
-
-# from tools import *
-# from words import *
-# from models import *
-# from realism import *
-# print('?')# Import
-from pandarallel import pandarallel
-
-# Initialization
-pandarallel.initialize(progress_bar=False,verbose=False)

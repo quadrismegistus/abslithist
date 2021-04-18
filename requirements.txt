@@ -5,10 +5,7 @@ numba
 fastdist
 tabula-py
 gensim
-<<<<<<< HEAD
 plotnine
 mapply
 xlrd
-=======
-plotnine
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
+yapmap

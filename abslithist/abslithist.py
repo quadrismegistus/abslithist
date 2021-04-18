@@ -1,9 +1,6 @@
 import os,sys; sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),'.'))
-<<<<<<< HEAD
 from lltk.tools import *
 import lltk
-=======
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
 from tools import *
 from tqdm import tqdm
 from collections import defaultdict,Counter
@@ -16,24 +13,18 @@ p9.options.dpi=300
 from scipy.stats import zscore
 import math,time
 import nltk,lltk
-<<<<<<< HEAD
 tqdm.pandas()
 import lltk
 import mpi_slingshot as sl
 import tempfile
 from scipy.stats import percentileofscore
-=======
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
 
 
 
 PATH_HERE = os.path.dirname(os.path.realpath(__file__))
 PATH_ROOT = os.path.abspath(os.path.join(PATH_HERE,'..'))
 PATH_DATA = os.path.abspath(os.path.join(PATH_ROOT,'data'))
-<<<<<<< HEAD
 PATH_FIGS = os.path.abspath(os.path.join(PATH_ROOT,'figures'))
-=======
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
 PATH_MODELS = os.path.abspath(os.path.join(PATH_DATA,'models'))
 ZCUT_NORMS_ORIG = 1.0
 FIELD_DIR=os.path.join(PATH_DATA,'fields')
@@ -47,19 +38,11 @@ PATH_VECFIELDS_PKL= os.path.join(FIELD_DIR,'data.fields_vec.pkl')
 PATH_VECFIELDS= os.path.join(FIELD_DIR,'data.fields_vec.csv.gz')
 PATH_SPELLING_D = os.path.join(FIELD_DIR,'spelling_variants_from_morphadorner.txt')
 PATH_NORMS = os.path.join(FIELD_DIR,'data.wordnorms_orig.csv')
-<<<<<<< HEAD
 VECNORMS_FN_PRE='data.wordnorms_vec2'
 VECNORMS_FN=f'{VECNORMS_FN_PRE}.csv'
 PATH_VECNORMS = os.path.join(FIELD_DIR,VECNORMS_FN)
 if not os.path.exists(SOURCE_DIR): os.makedirs(SOURCE_DIR)
 ZCUT = 0.666 #ZCUT_NORMS_ORIG
-=======
-VECNORMS_FN_PRE='data.wordnorms_vec'
-VECNORMS_FN=f'{VECNORMS_FN_PRE}.csv'
-PATH_VECNORMS = os.path.join(FIELD_DIR,VECNORMS_FN)
-if not os.path.exists(SOURCE_DIR): os.makedirs(SOURCE_DIR)
-ZCUT = ZCUT_NORMS_ORIG
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
 PATH_STOPWORDS=os.path.join(FIELD_DIR,'stopwords.txt')
 PATH_NAMES=os.path.join(FIELD_DIR,'capslocked.CanonFiction.txt')
 MIN_COUNT_MODEL=25
@@ -68,7 +51,6 @@ MODEL_PERIOD_LEN=100
 MODEL_MIN_COUNT=10
 MODEL_NUM_SKIPS=1000000
 MODEL_NUM_DIM=100
-<<<<<<< HEAD
 SOURCES_FOR_COUNTING = {'PAV-Conc','PAV-Imag','MRC-Conc','MRC-Imag','MT-Conc','LSN-Imag','Median'}
 # SOURCES_FOR_COUNTING = {'Median'}
 PERIODS_FOR_COUNTING = {}
@@ -124,12 +106,3 @@ from pandarallel import pandarallel
 
 # Initialization
 pandarallel.initialize(progress_bar=False,verbose=False)
-=======
-# SOURCES_FOR_COUNTING = {'PAV-Conc','PAV-Imag','MRC-Conc','MRC-Imag','MT-Conc','LSN-Imag','Median'}
-SOURCES_FOR_COUNTING = {'Median'}
-SOURCES_FOR_PLOTTING = {'PAV-Conc','PAV-Imag','MRC-Conc','MRC-Imag','MT-Conc','LSN-Imag','Median'}
-REMOVE_STOPWORDS_IN_WORDNORMS=True
-MODERNIZE_SPELLING=True
-COUNT_WINDOW_LEN=100
-# COUNT_WINDOW_LEN=50
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41

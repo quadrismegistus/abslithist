@@ -1,15 +1,8 @@
 import os,sys; sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),'..','..'))
 from abslithist import *
-<<<<<<< HEAD
 
 JITTER=0
 VERSION='v40-zcut05'
-=======
-from abslithist.words import *
-
-JITTER=0
-VERSION='v36'
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
 
 factor=2.5
 cutoff=1600
@@ -80,7 +73,6 @@ def edityear(y,spcr=spcr,cutoff=cutoff,breaks=prebreak_cuts):
 
 
 # loading data
-<<<<<<< HEAD
 def load_data_for_plotting(cname='canon_fiction',cdf=None,sources=SOURCES_FOR_PLOTTING,periods={}):
     # countdat
     if cdf is None:
@@ -91,17 +83,6 @@ def load_data_for_plotting(cname='canon_fiction',cdf=None,sources=SOURCES_FOR_PL
     if periods: cdf=cdf[cdf.period.isin(periods)]
     cdf['abs/conc']=cdf['num_abs']/cdf['num_conc']
     cdf['abs-conc']=cdf['num_abs']-cdf['num_conc']
-=======
-def load_data_for_plotting(cname='CanonFiction',sources=SOURCES_FOR_PLOTTING,periods={}):
-    # countdat
-    #cdf=pd.read_csv(f'data/counts/data.absconc.{cname}.csv')#.set_index('id').dropna()
-    #cdf.to_feather(f'data/counts/data.absconc.{cname}.ft')
-    cdf=pd.read_feather(f'data/counts/data.absconc.{cname}.v6.csv.ft')
-    # cdf=pd.read_csv(f'{COUNT_DIR}/data.absconc.{cname}.psgs.v7.csv.gz')
-    if sources: cdf=cdf[cdf.source.isin(sources)]
-    if periods: cdf=cdf[cdf.period.isin(periods)]
-    cdf['abs/conc']=cdf['num_abs']/cdf['num_conc']
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
     for key in ['abs','conc','neither']:
         cdf['perc_'+key]=cdf['num_'+key]/cdf['num_total']
 
@@ -121,10 +102,6 @@ def load_data_for_plotting(cname='CanonFiction',sources=SOURCES_FOR_PLOTTING,per
     alldf.loc[alldf['canon_genre'].str.strip()=="", "major_genre"]="Unknown"
 
     dfplot=alldf.groupby(['major_genre','canon_genre','author']).mean().reset_index().sort_values('abs/conc')
-<<<<<<< HEAD
-=======
-    # dfplot=alldf.groupby(['major_genre','canon_genre','author']).median().reset_index().sort_values('abs/conc')
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
 
     return dfplot
 
@@ -172,23 +149,16 @@ def plot_fiction(
         highlights=[],
         min_y=None,
         max_y=None,
-<<<<<<< HEAD
         spcr=0.5,
         vnum=VERSION):
-=======
-        spcr=0.5):
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
     
     # get value
     if valtype=='abs/conc':
         df['value'] = df['abs/conc'] #df['num_abs'] / df['num_conc']
     elif valtype=='abs-conc':
         df['value'] = df['num_abs']-df['num_conc'] #df['num_abs'] / df['num_conc']
-<<<<<<< HEAD
     elif valtype=='conc-abs':
         df['value'] = df['num_conc']-df['num_abs'] #df['num_abs'] / df['num_conc']
-=======
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
     elif valtype=='abs+conc':
         df['value'] = df['num_abs']+df['num_conc'] #df['num_abs'] / df['num_conc']
     elif valtype=='abs':
@@ -287,11 +257,7 @@ def plot_fiction(
         fig+=p9.geom_hline(yintercept = 0.0, show_legend=False)
         
     if dotsize:
-<<<<<<< HEAD
         fig+=p9.geom_point(alpha=0.25,size=2,data=df)#b3b3b3')#,show_legend=False)
-=======
-        fig+=p9.geom_point(alpha=0.5,size=2,data=df)#b3b3b3')#,show_legend=False)
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
     
     # labels
     ylabel=valtype2label.get(valtype,valtype)
@@ -334,13 +300,8 @@ def plot_fiction(
         if valtype in {'abs','conc','neither'}:
 #             fig+=scale_y_continuous(breaks=list(range(0,105,5)))
             fig+=p9.scale_y_continuous(breaks=[0,10,20,30,40,50,60,70,80,90,100])
-<<<<<<< HEAD
         elif valtype in {'abs-conc','conc-abs'}:
             fig+=p9.scale_y_continuous(breaks=[-60,-50,-40,-30,-20,-10,0,10,20,30,40,50,60],limits=[min_y-2,max_y+2])
-=======
-        elif valtype=='abs-conc':
-            fig+=p9.scale_y_continuous(breaks=[-50,-40,-30,-20,-10,0,10,20,30,40,50],limits=[min_y-2,max_y+2])
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
             # fig+=p9.scale_y_continuous(breaks=[-400,-300,-200,-100,0,100,200,300,400])
         else:
             fig+=p9.scale_y_continuous()
@@ -355,20 +316,12 @@ def plot_fiction(
             method='loess',
             alpha=0.15,
             color='gray',
-<<<<<<< HEAD
             data=df#[df.year>=1600]
-=======
-            data=df
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
         )
     
     if save_to:
         if save_to is True:
-<<<<<<< HEAD
             save_to=os.path.join(PATH_FIGS, f'fig.absrealism.{corpora[0]}.{valtype.replace("/","_")}{".clean" if jitter else ""}.{vnum}.png')
-=======
-            save_to=os.path.join('figures', f'fig.absrealism.{corpora[0]}.{valtype.replace("/","_")}{".clean" if jitter else ""}.{VERSION}.png')
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
             
         save_to_dir=os.path.dirname(save_to)
         if not os.path.exists(save_to_dir):

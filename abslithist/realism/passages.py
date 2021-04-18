@@ -13,7 +13,9 @@ def get_current_psg_scores():
 
 
 
-def to_sentdf(txt,words_recog=set(),num_word_min=45,vald={},valname='val'):
+# Parse raw text into paras/sentences
+
+def to_sentdf(txt,words_recog=set(),num_word_min=45,vald={},valname='val',sep_para='\n\n'):
     ntok,nword,npara,nsent=0,-1,0,0
     txt=txt.strip()
     o=[]
@@ -24,7 +26,7 @@ def to_sentdf(txt,words_recog=set(),num_word_min=45,vald={},valname='val'):
             '\n':'|'
         }.get(x,x)
     
-    for pi,para in enumerate(txt.split('\n\n')):
+    for pi,para in enumerate(txt.split(sep_para)):
         para=para.strip()
         for si,sent in enumerate(tokenize_sentences(para)):
             sent=sent.strip()
@@ -58,6 +60,7 @@ def to_sentdf(txt,words_recog=set(),num_word_min=45,vald={},valname='val'):
 # sentdf
 
 def to_psgdf(sentdf_or_txt,tfield='Abs-Conc.Median.median',norms=None,tokname='tokl',valname='val',nmin=50,stopwords=set()):
+    
     if norms is None: norms=get_allnorms()
     normsok=norms[tfield].dropna()
     stopwords|=get_stopwords()

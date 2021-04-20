@@ -35,8 +35,8 @@ def periodize(y):
 		return y//bin_year_by * bin_year_by
 
 def tokenize_agnostic(txt):
-    import re
-    return re.findall(r"[\w']+|[.,!?; -—–\n]", txt)
+	import re
+	return re.findall(r"[\w']+|[.,!?; -—–\n]", txt)
 
 def display_source(code):
 	import IPython
@@ -138,17 +138,20 @@ def writegen(fnfn,generator,header=None,args=[],kwargs={},find_all_keys=False,to
 	print('>> saved:',fnfn)
 
 def to_cent(y):
-    return f'C{(y//100)+1}'
-    
+	return f'C{(int(y)//100)+1}'
+
 def to_halfcent(y):
-    yy=y//50*50
-    cy=to_cent(y)
-    cy+='l' if int(str(y)[-2:])==50 else 'e'
-    return cy
+    numcent=(y//100)+1
+    le='l' if (y%100)>=50 else 'e'
+    return f'C{numcent}{le}'
+
 def to_field_period(year):
-    if year<1700: return 'C17'
-    if year>=2000: return 'C20'
-    return to_cent(year)
+	try:
+		if year<1700: return 'C17'
+		if year>=2000: return 'C20'
+		return to_cent(year)
+	except ValueError:
+		return 'median'
 
 def get_slices(l,num_slices=None,slice_length=None,runts=True,random=False):
 	"""

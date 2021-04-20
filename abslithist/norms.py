@@ -1,6 +1,4 @@
-import os,sys; sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),'..','..'))
 from abslithist import *
-from abslithist.words import *
 
 SOURCES = ['PAV-Conc','MRC-Conc','MT-Conc','PAV-Imag','MRC-Imag','LSN-Imag','LSN-Perc','LSN-Sens','Median']
 BAD_SOURCES = {}#'LSN-Perc','LSN-Sens'}
@@ -179,12 +177,17 @@ def gen_orignorms():
 def filter_norms(df,remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
     return df if not remove_stopwords else df.loc[[w for w in df.index if w not in get_stopwords()]]
 
+DATA_ORIGNORMS=None
 def get_orignorms(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
-    df=pd.read_csv(PATH_NORMS).set_index('word')
-    df=filter_norms(df,remove_stopwords=remove_stopwords)
-    # add median?
-    df['Abs-Conc.Median'] = df.median(axis=1)
-    return df
+    global DATA_ORIGNORMS
+    if DATA_ORIGNORMS is None:
+        # print('loading orig norms')
+        df=pd.read_csv(PATH_NORMS).set_index('word')
+        df=filter_norms(df,remove_stopwords=remove_stopwords)
+        # add median?
+        df['Abs-Conc.Median'] = df.median(axis=1)
+        DATA_ORIGNORMS=df
+    return DATA_ORIGNORMS
 
 
 
@@ -365,17 +368,20 @@ def format_norms_as_long(dfnorms,zcut=ZCUT):
     return pd.DataFrame(ld).sort_values('z')
     
 
-
+ALLNORMS=None
 def get_allnorms(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
-    # orig
-    dfnorms_orig = get_orignorms(remove_stopwords=remove_stopwords)
-    dfnorms_orig.columns = [c+'.orig' for c in dfnorms_orig.columns]
-    
-    # vecs
-    dfnorms_vec = get_vecnorms(add_median=True,remove_stopwords=remove_stopwords)
-    
-    # join
-    return dfnorms_vec.join(dfnorms_orig,how='outer')
+    global ALLNORMS
+    if ALLNORMS is None:
+        # print('loading allnorms')
+
+        # orig
+        dfnorms_orig = get_orignorms(remove_stopwords=remove_stopwords)
+        dfnorms_orig.columns = [c+'.orig' for c in dfnorms_orig.columns]
+        # vecs
+        dfnorms_vec = get_vecnorms(add_median=True,remove_stopwords=remove_stopwords)
+        # join
+        ALLNORMS=dfnorms_vec.join(dfnorms_orig,how='outer')
+    return ALLNORMS
 
 def show_origcontrasts(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
     return show_contrasts(get_origcontrasts(remove_stopwords=remove_stopwords))
@@ -385,6 +391,32 @@ def show_veccontrasts(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
 
 def show_allcontrasts(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
     return show_contrasts(get_allcontrasts(remove_stopwords=remove_stopwords))
+
+
+
+### get scores for set of words
+NORMDICTS={}
+def get_norm_dict(contrast='Abs-Conc',source='Median',period='median',norms=None,remove_stopwords=True,stopwords=set()):
+    global NORMDICTS
+    normkey=(contrast,source,period)#,remove_stopwords,stopwords))
+    if not normkey in NORMDICTS:
+        # print('loading norm dict')
+        if norms is None: norms=get_allnorms()
+        normsok=norms[f'{contrast}.{source}.{period}'].dropna()
+        if not stopwords and remove_stopwords: stopwords=get_stopwords()
+        wordsok=set(normsok.index) - stopwords
+        w2score=dict((a,b) for a,b in zip(normsok.index, normsok) if a not in stopwords)
+        scores=pd.Series(w2score.values())
+        w2score_perc=dict((a,percentileofscore(scores,b)) for a,b in w2score.items())
+        NORMDICTS[normkey]=(w2score,w2score_perc)
+    # else:
+        # print('found cached norm dict')
+    return NORMDICTS.get(normkey,({},{}))
+
+
+
+
+
 
 
 ###############
@@ -506,22 +538,26 @@ def get_vecnorms_fns(periods=None):
         l.append((period,os.path.join(FIELD_DIR,fn)))
     return l
 
+DATA_VECNORMS=None
 def get_vecnorms(periods=None,add_median=True,remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
-    df=pd.read_csv(PATH_VECNORMS).set_index('word')
-    df=filter_norms(df,remove_stopwords=remove_stopwords)
-    
-    colgroups=defaultdict(set)
-    for col in df.columns:
-        if col.count('.')!=2: continue
-        contrast,source,period=col.split('.')#[-1]
-        colgroups[contrast+'.'+source]|={col}
-    
-    for contrastsource,pcols in colgroups.items():
-        dfp = df[pcols].median(axis=1)
-        newcolname=contrastsource+'.median'
-        df[newcolname]=dfp
-    
-    return df
+    global DATA_VECNORMS
+    if DATA_VECNORMS is None:
+        # print('loading vec norms')
+        df=pd.read_csv(PATH_VECNORMS).set_index('word')
+        df=filter_norms(df,remove_stopwords=remove_stopwords)
+        
+        colgroups=defaultdict(set)
+        for col in df.columns:
+            if col.count('.')!=2: continue
+            contrast,source,period=col.split('.')#[-1]
+            colgroups[contrast+'.'+source]|={col}
+        
+        for contrastsource,pcols in colgroups.items():
+            dfp = df[pcols].median(axis=1)
+            newcolname=contrastsource+'.median'
+            df[newcolname]=dfp
+        DATA_VECNORMS=df
+    return DATA_VECNORMS
 
 
     # periods = set(col.split('.')[-1] for col in df.columns if col.count('.')>1)

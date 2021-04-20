@@ -19,6 +19,9 @@ import mpi_slingshot as sl
 import tempfile
 from scipy.stats import percentileofscore
 from yapmap import *
+import gensim,numpy as np
+from fastdist import fastdist
+from pprint import pprint
 
 
 PATH_HERE = os.path.dirname(os.path.realpath(__file__))
@@ -26,6 +29,11 @@ PATH_ROOT = os.path.abspath(os.path.join(PATH_HERE,'..'))
 PATH_DATA = os.path.abspath(os.path.join(PATH_ROOT,'data'))
 PATH_FIGS = os.path.abspath(os.path.join(PATH_ROOT,'figures'))
 PATH_MODELS = os.path.abspath(os.path.join(PATH_DATA,'models'))
+PATH_SCORES = os.path.abspath(os.path.join(PATH_DATA,'scores'))
+PATH_SCORES_BYTEXT = os.path.abspath(os.path.join(PATH_SCORES,'bytext4'))
+# PATH_SCORES_BYTEXT_SUMMARY = os.path.abspath(os.path.join(PATH_SCORES,'bytext4_summary.pkl'))
+
+
 ZCUT_NORMS_ORIG = 1.0
 FIELD_DIR=os.path.join(PATH_DATA,'fields')
 SOURCE_DIR=os.path.join(FIELD_DIR,'sources')
@@ -74,12 +82,15 @@ PATH_IMGCONVERT=os.path.join(PATH_HERE,'models','imgconvert.py')
 PATH_FIGS2=''#/home/ryan/Markdown/Drafts/AbsRealism/figures/'
 # PATH_PSG_CURRENT=os.path.join(PATH_DATA,'psgs','data.psgs.CanonFiction.v6.pkl')
 PATH_SCORES=os.path.join(PATH_DATA,'scores')
-PATH_PSG_CURRENT=os.path.join(PATH_DATA,'psgs','data.psgs.CanonFiction.v8.pkl')
+PATH_PSG_CURRENT=os.path.join(PATH_SCORES,'data.all_psgs.pkl')
 PATH_SCORE_CURRENT=os.path.join(PATH_SCORES,'data.canon_fic_scores.v2.csv')
 
 PATH_PSG_SCORE_SMPL=os.path.join(PATH_SCORES,'bypsg2.smpl.t1618294931.pkl')
 PATH_PSG_SCORE=os.path.join(PATH_SCORES,'bypsg3.pkl')
 PATH_PSG_IMGS=os.path.join(PATH_SCORES,'bypsg2_smpl_img3')
+
+WORD2VEC_BY_SENTENCE=True
+DEFAULT_NUM_WORDS_IN_PSG=50
 
 
 C=lltk.load(DEFAULT_CORPUS)

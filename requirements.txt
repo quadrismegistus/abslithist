@@ -1,3 +1,4 @@
+ujson
 pandas
 numpy
 scipy
@@ -9,3 +10,6 @@ plotnine
 mapply
 xlrd
 yapmap
+simplejson
+unicodecsv
+colour

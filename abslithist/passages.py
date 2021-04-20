@@ -1,4 +1,3 @@
-import os,sys; sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),'..','..'))
 from abslithist import *
 
 QNUM=1000
@@ -7,16 +6,78 @@ USE_COLOR=False
 
 VERSION='v3'
 
-def get_current_psg_scores():
-    dfpsg = pd.read_pickle(PATH_PSG_SCORE).reset_index()
-    return dfpsg
+
+
+
+
+
+def nodblspc(x):
+    while '  ' in x: x=x.replace('  ',' ')
+    return x
+
+def corpora_meta(corpora,incl_meta=[]):
+    o=[]
+    for cname in corpora:
+        cdf=lltk.load(cname).meta
+        cdf['corpus']=cname
+        o.extend(cdf.reset_index().to_dict('records'))    
+    odf=pd.DataFrame(o).set_index(['corpus','id']).sort_index()
+    for mk in incl_meta:
+        if not mk in odf.columns:
+            odf[mk]=''
+    odf=odf[incl_meta] if incl_meta else odf
+    if 'author' in incl_meta:
+        odf['author_lname']=odf.author.apply(lambda x: x.split(',')[0].strip())
+    return odf
+
+# corpora_meta(['CanonFiction','MarkMark'])
+
+
+def get_passages_text(id,corpus=DEFAULT_CORPUS,nmin=50):
+    ifn=os.path.join(PATH_SCORES_BYTEXT,corpus,id,'passages.pkl')
+    if not os.path.exists(ifn): return pd.DataFrame()
+    df = pd.read_pickle(ifn).reset_index()
+    if nmin: df=df[df.num_recog>=nmin]
+    if 'html' in df.columns: df=df.drop('html',1)
+    df['id']=id
+    df['corpus']=corpus
+    df['txt'] = df.txt.apply(lambda x: x.replace('  ',' '))
+    return df
+
+def get_current_psg_scores(cachefn=PATH_PSG_CURRENT,corpora=['CanonFiction'],num_proc=4,force=False,incl_meta=['year','author','canon_genre','major_genre'],**attrs):
+    df=None
+    if force or not os.path.exists(cachefn):
+        objs=[(t.id,cname) for cname in corpora for t in lltk.load(cname).texts()]
+        res = pmap(_do_get_current_psg_scores, objs, num_proc=num_proc, **attrs)
+        if res is not None and len(res):
+            df=pd.concat([df.reset_index() for df in res])
+            df=df.sort_values('val')
+            df['txt']=df.txt.progress_apply(nodblspc)
+            df.to_pickle(cachefn)
+    elif os.path.exists(cachefn):
+        df=pd.read_pickle(cachefn)
+    if df is None or not len(df): return df
+
+    # join with meta?
+    dfmeta=corpora_meta(corpora,incl_meta=incl_meta)
+    odf=df.set_index(['corpus','id']).join(dfmeta).reset_index()
+    odf=odf[~odf.val.isna()].sort_values('val')
+    if 'val_perc' in odf.columns:
+        odf['val_perc_int']=odf.val_perc.apply(int)
+    return odf
+
+def _do_get_current_psg_scores(inp):
+    return get_passages_text(*inp)
+
+
 
 
 
 # Parse raw text into paras/sentences
 
-def to_sentdf(txt,words_recog=set(),num_word_min=45,vald={},valname='val',sep_para='\n\n'):
+def to_sents(txt,words_recog=set(),num_word_min=45,vald={},valname='val',sep_para='\n\n',stopwords=set()):
     ntok,nword,npara,nsent=0,-1,0,0
+    if not stopwords: stopwords=get_stopwords()
     txt=txt.strip()
     o=[]
     
@@ -26,12 +87,13 @@ def to_sentdf(txt,words_recog=set(),num_word_min=45,vald={},valname='val',sep_pa
             '\n':'|'
         }.get(x,x)
     
-    for pi,para in enumerate(txt.split(sep_para)):
+    paras=txt.split(sep_para) if sep_para else [txt]
+    for pi,para in enumerate(paras):
         para=para.strip()
         for si,sent in enumerate(tokenize_sentences(para)):
             sent=sent.strip()
             swords=tokenize_agnostic(sent)
-            swords=[_cleantok(x) for x in swords]
+            # swords=[_cleantok(x) for x in swords]
             for w in swords:
                 w=w.strip()
                 wl=w.lower()
@@ -53,37 +115,97 @@ def to_sentdf(txt,words_recog=set(),num_word_min=45,vald={},valname='val',sep_pa
             nsent+=1
         npara+=1
     odf=pd.DataFrame(o)
-    return odf.set_index('i_tok') if 'i_tok' in odf.columns else odf
+    odf=odf.set_index('i_tok') if 'i_tok' in odf.columns else odf
+    if 'tokl' in odf.columns:
+        odf['is_stopword']=odf.tokl.apply(lambda x: int(x in stopwords))
+    return odf
 
 # # Test
-# sentdf=to_sentdf(willoughby_full)
+# sentdf=to_sents(willoughby_full)
 # sentdf
 
-def to_psgdf(sentdf_or_txt,tfield='Abs-Conc.Median.median',norms=None,tokname='tokl',valname='val',nmin=50,stopwords=set()):
-    
-    if norms is None: norms=get_allnorms()
-    normsok=norms[tfield].dropna()
-    stopwords|=get_stopwords()
-    wordsok=set(normsok.index) - stopwords
-    w2score=dict((a,b) for a,b in zip(normsok.index, normsok) if a not in stopwords)
-    sentdf = to_sentdf(sentdf_or_txt) if type(sentdf_or_txt)==str else sentdf_or_txt
-    if tokname in sentdf.columns:
-        sentdf['is_recog']=sentdf[tokname].apply(lambda w: int(w in wordsok))
-        sentdf[valname]=sentdf[tokname].apply(lambda w: w2score.get(w))
-    if valname in sentdf.columns:
-        scores=pd.Series(w2score.values())
-        sentdf[valname+'_perc']=sentdf[valname].apply(lambda x: percentileofscore(scores,x))
-    return sentdf#.set_index('i_tok')
+
 
 # # Test
 # psgdf=to_psgdf(sentdf)
 # psgdf
 
 
-def to_psg_html(df,valcol='val_perc'):
+## Text scores to passages
+def divide_by_sent_windows(df,nmin=DEFAULT_NUM_WORDS_IN_PSG):
+    o=[]
+    ipsg=0
+    nnow=0
+    df=df.sort_values(['i_para','i_sent'])
+    for (para_i,sent_i),dfg in sorted(df.groupby(['i_para','i_sent'])):
+        o+=[ipsg for n in range(len(dfg))]
+        nnow+=dfg.is_recog.sum()        
+        if nnow>=nmin:
+            ipsg+=1
+            nnow=0
+    return o
+
+
+def do_detokenize_scores(psgdf,valcols=['val','val_perc']):
+    psgdf=psgdf.sort_values('i_tok')
+#     txt=''.join(psgdf.tok)
+    txt=' '.join(
+        #' '.join(sentdf.tok)
+        detokenize(sentdf.tok)
+        for i,sentdf in sorted(psgdf.groupby('i_sent'))
+    )
+    data=odx={'txt':txt}#, 'html':to_passage_html(psgdf)}
+    words=[x for x in psgdf[psgdf.is_punct==0].tokl]
+    recogwords=[x for x in psgdf[psgdf.is_recog==1].tokl]
+    
+    data['i_tok']=min(psgdf.index)
+    for icol in ['i_para','i_sent','i_word']:
+        data[icol]=min(psgdf[icol])
+
+    data['num_sent']=psgdf.i_sent.nunique()
+    data['num_word']=len(words)
+    data['num_word_types']=len(set(words))
+    data['ttr']=data['num_word_types'] / data['num_word'] if data['num_word'] else np.nan
+
+    data['num_recog']=len(recogwords)
+    data['num_recog_types']=len(set(recogwords))
+    data['ttr_recog']=data['num_recog_types'] / data['num_recog'] if data['num_recog'] else np.nan
+
+
+    for vc in valcols:    
+        data[vc]=psgdf[vc].mean()
+        # data[f'{vc}_mean']=psgdf[vc].mean()
+        # data[f'{vc}_median']=psgdf[vc].median()
+        # data[f'{vc}_stdev']=psgdf[vc].std()
+
+    return pd.DataFrame([odx])
+
+def to_passages(txt_or_score_df,nmin=DEFAULT_NUM_WORDS_IN_PSG,num_proc=1,progress=False):
+    assert type(txt_or_score_df) in {str,pd.DataFrame}
+    df=to_scores(txt_or_score_df,sep_para=None) if type(txt_or_score_df)==str else txt_or_score_df
+    df['i_psg']=divide_by_sent_windows(df,nmin=nmin)
+    return pmap_groups(
+        do_detokenize_scores,
+        df.groupby('i_psg'),
+        num_proc=num_proc,
+        progress=progress,
+        use_cache=False,
+        desc='Parsing passages'
+    )
+
+
+
+
+
+
+def to_passage_html(txt_or_score_df,valcol='val_perc',show=False):
+    assert type(txt_or_score_df) in {str,pd.DataFrame}
+    df=to_scores(txt_or_score_df) if type(txt_or_score_df)==str else txt_or_score_df
+    
     words=[]
     for i,row in df.fillna('').iterrows():
         word=tok=cleantxt(row.tok)
+        if not tok: continue
         if tok=='@':
             words+=[' \n ']
             continue
@@ -99,7 +221,11 @@ def to_psg_html(df,valcol='val_perc'):
         words.append(word)
     xml=f'<p>{" ".join(words)}</p>'
     while '  ' in xml: xml=xml.replace('  ',' ')
-    return xml
+    if show:
+        init_css()
+        printm(xml)
+    else:
+        return xml
 
 def to_psg_density(
         df,
@@ -171,105 +297,10 @@ def showpsg_t(txt,t,title='',charname='',**attrs):
 
 
 
-def df2xml(df,abs_below=-ZCUT,conc_above=ZCUT,qnum=1000,zf=3,valcol='z'):
-    """ @DEPRECATED """
-
-    words=[]
-    if not 'bin' in df:
-        labels=[
-            str(x).zfill(zf) if not np.isnan(x) else ''
-            for x in range(qnum)
-        ]
-        df['bin']=[str(x) for x in pd.qcut(df[valcol],q=qnum,labels=labels,duplicates='drop')]
-    
-    for i,row in df.fillna('').iterrows():
-        tok=cleantxt(row.tok)
-        if tok=='@':
-            words+=[' \n ']
-            continue
-        # if not tok: continue
-        if not tok[0].isalpha() and words and tok!='``':
-            words[-1]+=tok
-            continue
-        if row.bin:
-            word=f'<conc{row.bin}>{tok}</conc{row.bin}>'
-        else:
-            word=tok
-        # ?
-        if row[valcol]:
-            z=float(row[valcol])
-            if z<abs_below:
-                word=f'<abs>{word}</abs>'
-            elif z>conc_above:
-                word=f'<conc>{word}</conc>'
-            else:
-                word=f'<neither>{word}</neither>'            
-        words.append(word)
-    # xml='<p>' + ' '.join(words) + '</p>'
-    # xml=f'<p>{cleanstrip(detokenize(words))}</p>'
-    xml=f'<p>{" ".join(words)}</p>'
-    # xml=xml.replace(' ,',',')
-    return xml
-
-
-
-def plot_densityz(df,title='',fig=None):
-    p9.options.dpi=600
-    p9.options.figure_size=(8,4)
-    df=df.dropna()
-
-    # density plot
-    avgstr=f'Average = {round(df.z.mean(),2)}'
-    
-    if fig is None:
-        fig=p9.ggplot(p9.aes(x='z',y='..count..'))
-    for nn in range(25):
-        fig+=p9.geom_density(data=df.sample(n=1000,replace=True))
-
-    return fig
-
-PSG_NORMS=None
-def get_psg_norms(cachefn='.data.cache.dfnorms.pkl'):
-    global PSG_NORMS
-    if PSG_NORMS is None:
-        import lltk
-        if os.path.exists(cachefn):
-            # print('>> reading from:',cachefn)
-            PSG_NORMS=lltk.read_df(cachefn)
-        else:
-            print('>> loading norms...')
-            PSG_NORMS = format_norms_as_long(get_allnorms())
-            print('>> saving to:',cachefn)
-            lltk.save_df(PSG_NORMS,cachefn)
-    return PSG_NORMS
-
 def tknz(txt):
     p = re.compile(r"\d+|[-'a-z]+|[ ]+|\s+|[.,]+|\S+", re.I)
     slice_starts = [m.start() for m in p.finditer(txt)] + [None]
     return [txt[s:e] for s, e in zip(slice_starts, slice_starts[1:])]
-
-def psg2df(txt,stopwords={},periods={'median'},dfnorms=None,qnum=QNUM,zf=3,sources={'Median'}):
-    labels=[str(x).zfill(zf) for x in range(qnum)]
-    if dfnorms is None: dfnorms=get_psg_norms()
-    norms=dfnorms if not periods else dfnorms[dfnorms.period.isin(periods)]
-    if sources: norms=norms[norms.source.isin(sources)]
-    wordavg=norms[['word','z']].groupby('word').mean()
-    wordavg['bin']=[str(x) for x in pd.qcut(wordavg.z,q=qnum,labels=labels)]
-    txt=cleantxt(txt)
-    txtl=tknz(txt)
-    df=pd.DataFrame()
-    df['tok']=txtl
-    df['i']=list(range(len(txtl)))
-    df['tokl']=df['tok'].apply(lambda x: x.lower())
-    df['tokl_mod']=df['tokl'].apply(lambda x: get_spelling_modernizer().get(x,x).lower())
-    df=df.set_index('tokl_mod').join(wordavg,how='left').rename_axis('tokl_mod').reset_index().sort_values('i')
-    # df=df.set_index('tokl').join(wordavg,how='left').rename_axis('tokl').reset_index().sort_values('i')
-    #df.loc[df['tokl'].isin(stopwords),'z']=np.nan
-    df['z']=[np.nan if tokl in stopwords else x
-            for tokl,x in zip(df.tokl, df.z)]
-    df['bin']=['' if tokl in stopwords else x
-            for tokl,x in zip(df.tokl, df.bin)]
-    return df
 
 def cleantxt(txt):
 #     return txt#.replace("*","").replace('`','').replace("'","").replace('"','').replace('\n',' @ ').replace('\\','')
@@ -328,50 +359,6 @@ def showpsg(txt,title='',other_txt='',showxml=True,stopwords={},periods={},show=
 
 
 
-
-
-# def get_current_dfall_psgs(corpus_name='CanonFiction'):
-#     cdf=pd.DataFrame(readgen_jsonl(PATH_PSGS))
-#     cdf=cdf[cdf.num_total == cdf.num_total.max()]
-#     cdf['abs-conc']=cdf['num_abs']-cdf['num_conc']
-#     cdf['abs/conc']=cdf['num_abs']/cdf['num_conc']
-
-#     import lltk
-#     C=lltk.load(corpus_name)
-#     cdf['abs/conc']=cdf['num_abs']/cdf['num_conc']
-#     cdf['abs-conc']=cdf['num_abs']-cdf['num_conc']
-#     cdf['abs-conc_z']=zscore(cdf['abs-conc'])
-#     dfall=cdf.merge(C.metadata,on='id').sort_values('abs-conc')
-#     dfall=dfall[
-#         ['id','year','title','author','passage','abs-conc','abs-conc_z',
-#          'canon_genre','major_genre',
-#         'num_abs','num_conc','num_neither','num_types','num_total','num_tokens']
-#     ]
-#     return dfall
-
-
-# def compare_extremes(dfall,corpus_name='CanonFiction',topn=100):
-#     C=lltk.load(corpus_name)
-#     most_conc = dfall.head(topn)
-#     most_abs = dfall[dfall.title!='The Making of Americans'].sort_values('abs-conc',ascending=False).head(topn)
-    
-#     for i_conc,(index_conc,row_conc) in enumerate(tqdm(list(most_conc.iterrows()))):
-#         idx_conc=row_conc.id
-#         t_conc=C.textd[idx_conc]
-
-#         i_abs=i_conc
-#         row_abs=most_abs.iloc[i_conc]
-#         idx_abs=row_abs.id
-#         t_abs=C.textd[idx_conc]
-        
-#         fn=compare_psgs(
-#             (row_abs.passage, row_conc.passage),
-#             (t_abs, t_conc),
-#             (f'#{i_abs+1} most abstract passage',f'#{i_conc+1} most concrete passage'),
-#         )
-#         display(fn)
-#         display(Image(filename=fn))
-#         break
 def compare_psgs_table(inpdf,width=555,ofn='fig.psg_tbl.png',**attrs):
     inpdf['year']=inpdf.t.apply(lambda t: t.year)
     inpdf['txt']=inpdf.txt.apply(lambda x: x.strip())
@@ -577,130 +564,10 @@ def get_css(use_color=USE_COLOR,qnum=QNUM,zf=3):
     cssstr=f'<style type="text/css">' + ("\n".join(css)) + '</style>'
     return cssstr
 
-def year2period(y):
-    if y<1600: return 'C16'
-    if y>1900: return 'C20'
-    return f'C{(y//100)+1}'
 
 def init_css(use_color=USE_COLOR):
     printm(get_css(use_color=use_color))
-def year2period(y):
-    if y<1600: return 'C16'
-    if y>1900: return 'C20'
-    return f'C{(y//100)+1}'
 
-
-dfall_cols = ['id','year','title','author','passage','abs-conc','abs-conc_z',
-            'num_abs','num_conc','num_neither','num_types','num_total','num_tokens',
-            'major_genre','canon_genre']
-
-def get_current_dfall_psgs(corpus_name=DEFAULT_CORPUS,meta_cols=['id','year','title','author','major_genre','canon_genre']):
-    df=read_df(PATH_PSG_CURRENT).merge(
-        lltk.load(corpus_name).meta.reset_index()[meta_cols].reset_index(),
-        on='id',
-        how='left'
-    )
-    return df
-
-# def get_current_dfall_psgs(corpus_name=DEFAULT_CORPUS,cachefn=None):
-#     if not cachefn: cachefn=os.path.join(PATH_DATA,'psgs','cache.dfall.psgs.pkl')
-#     # os.system(f'rm {cachefn}')
-#     if not os.path.exists(cachefn):
-#         cdf=pd.DataFrame(readgen_jsonl(PATH_PSGS))
-#         cdf=cdf[cdf.num_total == cdf.num_total.max()]
-#         cdf['abs-conc']=cdf['num_abs']-cdf['num_conc']
-#         cdf['abs/conc']=cdf['num_abs']/cdf['num_conc']
-
-#         C=lltk.load(corpus_name)
-#         cdf['abs/conc']=cdf['num_abs']/cdf['num_conc']
-#         cdf['abs-conc']=cdf['num_abs']-cdf['num_conc']
-#         cdf['abs-conc_z']=zscore(cdf['abs-conc'])
-#         dfall=cdf.merge(C.metadata,on='id').sort_values('abs-conc')
-#         for c in dfall_cols:
-#             if not c in set(dfall.columns):
-#                 dfall[c]=''
-#         dfall=dfall[dfall_cols]
-#         save_df(dfall,cachefn)
-#         return dfall
-#     else:
-#         return read_df(cachefn)
-
-
-def saveextremes(dfall, name='concrete'):
-    topn=25
-    most_conc = dfall.head(topn)
-    most_abs = dfall[dfall.title!='The Making of Americans'].sort_values('abs-conc',ascending=False).head(topn)
-
-    for i,(index,row) in enumerate(tqdm(list(most.iterrows()))):
-        idx=row.id
-        t=C.textd[idx]
-        title=f'''#{i+1} most {name} passage: {row.author.split(',')[0]}, _{row.title[:50]}_ ({row.year})'''
-        showpsg(
-            row.passage,
-            title,
-            t.txt,
-            periods={year2period(t.year)}
-        )
-    #     break
-
-
-
-
-# def txt2psgs1(txt,psg_len=50,bysent=True):
-#     sentdfs=[]
-#     nw=0
-#     si=0
-#     pi=0
-#     for sent in tqdm(tokenize_sentences(txt)):
-#         sentdf=psg2df(sent)
-#         sentdf['i_sent']=si
-#         si+=1
-#         sentdfs.append(sentdf)        
-#         sentnw=len(sentdf.z.dropna())
-#         nw+=sentnw
-#         if nw>=psg_len:
-#             odf=pd.concat(sentdfs)
-#             odf['i']=list(range(len(odf)))
-#             odf['i_psg']=pi
-#             pi+=1
-#             yield odf
-#             sentdfs=[]
-#             nw=0
-#     if len(sentdfs):
-#         odf=pd.concat(sentdfs)
-#         odf['i']=list(range(len(odf)))
-#         odf['i_psg']=pi
-#         yield odf
-
-def txt2psgs(txt,psg_len=50,bysent=True,num_proc=1,**y):
-    sentdfs=[]
-    nw=0
-    si=0
-    pi=0
-    iterr=pmap_iter(
-        psg2df,
-        tokenize_sentences(txt),
-        desc='Scoring passages',
-        num_proc=num_proc
-    )
-    for si,sentdf in enumerate(iterr):
-        sentdf['i_sent']=si
-        sentdfs.append(sentdf)        
-        sentnw=len(sentdf.z.dropna())
-        nw+=sentnw
-        if nw>=psg_len:
-            odf=pd.concat(sentdfs)
-            odf['i']=list(range(len(odf)))
-            odf['i_psg']=pi
-            pi+=1
-            yield odf
-            sentdfs=[]
-            nw=0
-    if len(sentdfs):
-        odf=pd.concat(sentdfs)
-        odf['i']=list(range(len(odf)))
-        odf['i_psg']=pi
-        yield odf
 
 def path2psgs(path,*x,**y):
     with open(path) as f: txt=f.read()
@@ -713,37 +580,220 @@ def nuniq(x): return len(set(x))
 def nword(toks):
     return len([x for x in toks if type(x)==str and x and x[0].isalpha()])
     
-def psgdf2row(psgdf):
-    psgdf=psgdf.sort_values('i')
-    txt=cleantxt(detokenize(psgdf.tok).replace('@','')).strip()
-    xml=df2xml(psgdf)
-    while '  ' in txt: txt=txt.replace('  ',' ').replace(' .','.')
-    odx={'txt':txt,'xml':xml}
-    data=psgdf.agg({
-        'i':maxint,
-        'z':np.mean,
-        'i_sent':maxint,
-        'i_psg':maxint
-    })
-    words=[x for x in psgdf.tokl if x and x[0].isalpha()]
-    data['num_row']=len(psgdf)
-    data['num_word']=len(words)
-    data['num_word_types']=len(set(words))
-    data['num_recog']=len(psgdf.dropna().tokl)
-    data['num_recog_types']=len(set(psgdf.dropna().tokl))
-    data['num_sent']=nuniq(psgdf.i_sent)
-    data['num_word_types']=len(set(psgdf.tokl))
-    data['ttr_recog']=data['num_recog_types'] / data['num_recog']
-    data['ttr']=data['num_word_types'] / data['num_word']
-    for k,v in dict(data).items(): odx[k]=v
-    return odx
 
 
-def txt2psgrows(txt):
-    return pd.DataFrame(
-        psgdf2row(psgdf)
-        for psgdf in txt2psgs(txt)
+### From realism.py --> still nec?
+
+import os,sys; sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),'..','..'))
+from abslithist import *
+from abslithist.words import *
+
+FICTION_CORPUS_NAME='CanonFiction'
+
+def binz(z,zcut=1):
+    if z>=zcut: return 'Abs'
+    if z<=(-1 * zcut): return 'Conc'
+    return 'Neither'
+def biny(y,by=100,miny=1500,offy=1400):
+    return y//by*by if y>=miny else offy
+
+def binz2(row,zcut=1,zcut_both=0):
+    zbin=binz(row['abs-conc_z'],zcut=zcut)
+    if zbin == 'Neither':
+        if row['num_abs_z']>=zcut_both and row['num_conc_z']>=zcut_both:
+            zbin='Both'
+    return zbin
+
+
+
+def get_current_text_scores():
+    return pd.read_csv(PATH_SCORE_CURRENT)
+
+def get_all_passages(cname=FICTION_CORPUS_NAME):
+    df=pd.read_csv(os.path.join(COUNT_DIR,f'data.absconc.{cname}.psgs.v5.csv.gz'))
+    df['abs-conc']=df['num_abs']-df['num_conc']
+    # df['abs+conc']=df['num_abs']+df['num_conc']
+    # df['abs/conc']=df['num_abs']/df['num_conc']
+    
+    for k in ['abs-conc','num_abs','num_conc','num_neither']:
+        df[f'{k}_z']=zscore(df[k])
+
+    df['zbin']=df.apply(binz2,1)
+    # get year
+    C=lltk.load(cname)
+    meta=C.metadata.reset_index()
+    id2year=dict(zip(meta.id,meta.year))
+    df['year']=[id2year.get(idx) for idx in df.id]
+    df['ybin']=df['year'].apply(biny)
+    return df
+
+    #C=lltk.load(cname)
+    #meta=C.metadata
+    #df=meta[['id','author','title','year','major_genre','canon_genre']].merge(df,on='id').sort_values('abs-conc')
+
+def sample_passages(df,sample_by=['ybin','zbin'],n=100):
+    df_sample=df[df.zbin!=None].groupby(sample_by).sample(n=n,replace=True).drop_duplicates().sample(frac=1)
+    return df_sample
+
+# convert to prodigy
+
+def to_prodigy(df_sample,ofn,force=False):
+    # do not allow overwrite
+    ofn=os.path.join(PSGS_DIR,ofn)
+    if not force and os.path.exists(ofn):
+        print(f'{ofn} already exists!')
+        return
+    from bs4 import BeautifulSoup
+    with open(ofn,'w') as of:
+        for d in tqdm(df_sample.to_dict('records')):
+            text=d['passage']
+            dom=BeautifulSoup(text,'lxml')
+            d2={'text':dom.get_text(), 'html':d['passage']}
+            d2['meta']=dict((k,v) for k,v in d.items() if k!='passage')
+            d2str=json.dumps(d2)
+            of.write(d2str+'\n')
+
+
+def printpsg(row):
+    # printm(row.passage)
+        
+    psg=row.passage.replace('\\\\','\n')
+    while '\n\n' in psg: psg=psg.replace('\n\n','\n')
+    psg=psg.strip().replace('\n','\n>\t')
+    psg=psg.replace("''",'"')
+    unit = f"""
+> ... {psg} ...
+> 
+> -- {row.get("author","Unknown Author")}, _{row.get("title","Unknown Title")}_ ({row.get("year","Unknown Year")})
+>    - Abstract words ({row['num_abs']})
+>        - {row['abs']}
+>    - Concrete words ({row['num_conc']})
+>        - {row['conc']}
+>    - Neither ({row['num_neither']})
+>        - {row['neither']}
+>    - Abs - Conc = {row['abs-conc']} ({row.get("abs-conc_z","?")}z)
+>    - Type / Token = {int(round(row['num_types'] / row['num_tokens'] * 100,0))}
+"""
+    printm(unit)
+
+
+
+
+def gen_bookpassages(t_or_idx,corpus=None,fname=None,save=False,periods={'median'},sources={'Median'}):
+    import lltk
+    if type(t_or_idx)==str:
+        if not corpus: return
+        C=lltk.load(corpus) if type(corpus)==str else corpus
+        if not idx in C.textd: return
+    else:
+        t=t_or_idx
+
+    ld=count_absconc_path(
+        t.path_txt,
+        sources=sources,
+        periods=periods,
+        incl_psg=True,
+        incl_eg=True,
+        num_eg=25,
+        psg_as_markdown=True,
+        markdown_uses_html=False,
+        modernize=True,
+        progress=True
     )
+    df=pd.DataFrame(ld)
+    df['abs-conc']=df['num_abs']-df['num_conc']
+    df['id']=t.id
+    df=df.merge(t.corpus.metadata,on='id',how='left')
+    if save: save_bookpassages(df,fname=fname if fname else t.id)
+    return df
+
+def save_bookpassages(df,fname,stacklen=100,incl_stats=True):
+    odir=os.path.join(PSGS_DIR,'psgs_'+fname)
+    if not os.path.exists(odir): os.makedirs(odir)
+    units = []
+    all_units=[]
+    done=0
+    for i,row in tqdm(df.iterrows(),total=len(df)):
+        psg=row.passage.replace('\\\\','\n')
+        while '\n\n' in psg: psg=psg.replace('\n\n','\n')
+        psg=psg.strip().replace('\n','\n>\t')#.replace("`","'")
+        perc_abs=row['num_abs']/row['num_total']*100
+        perc_conc=row['num_conc']/row['num_total']*100
+        perc_neither=row['num_neither']/row['num_total']*100
+        abs_conc = row['num_abs']-row['num_conc']
+        unit = f"""
+
+
+
+> {psg}
+"""
+        if incl_stats:
+            unit = """
+
+#### Slice #{i+1}
+
+""" + unit
+        unit2="""
+>    - Abstract words ({row['num_abs']})
+>        - {row['abs']}
+>    - Concrete words ({row['num_conc']})
+>        - {row['conc']}
+>    - Neither ({row['num_neither']})
+>        - {row['neither']}
+>    - Abs - Conc = {abs_conc}
+>    - Type / Token = {int(round(row['num_types'] / row['num_tokens'] * 100,0))}
+
+
+<hr/>
+"""
+
+        units.append(unit+unit2 if incl_stats else unit)
+        all_units.append((abs_conc,unit))
+        if len(units)>=stacklen or i==(len(df)-1):
+            done+=1
+            ofn = os.path.join(odir,f'psgs_{fname}_{str(done).zfill(4)}.md')
+            with open(ofn,'w') as of:
+                of.write('\n\n'.join(units))
+            units=[]
+    
+    # save top bottoms
+    most_abs = [y for x,y in sorted(all_units,reverse=True)][:stacklen]
+    most_conc = [y for x,y in sorted(all_units,reverse=False)][:stacklen]
+    most_zero = [y for x,y in sorted(all_units,key=lambda x: abs(x[0]))][:stacklen]
+    random.shuffle(all_units)
+    most_random = [y for x,y in all_units][:stacklen] #random.sample(all_units,stacklen if stacklen>len(all_units) else len(all_units))]
+    ofn_abs = os.path.join(odir,f'most_abs_{fname}.md')
+    ofn_conc = os.path.join(odir,f'most_conc_{fname}.md')
+    ofn_zero = os.path.join(odir,f'most_zero_{fname}.md')
+    ofn_random = os.path.join(odir,f'most_random_{fname}.md')
+    with open(ofn_abs,'w') as of: of.write('\n\n'.join(most_abs))
+    with open(ofn_conc,'w') as of: of.write('\n\n'.join(most_conc))
+    with open(ofn_zero,'w') as of: of.write('\n\n'.join(most_zero))
+    with open(ofn_random,'w') as of: of.write('\n\n'.join(most_random))
+
+
+def to_html(df):
+    units = []
+    for i,row in df.iterrows():
+        unit = f"""
+
+{row.passage}
+
+<br/><br/>
+&nbsp;&nbsp;<small>[{row['num_abs']} - {row['num_conc']} = {row['abs-conc']}]</small>
+
+<hr/>
+"""
+        units.append(unit)
+    return '\n\n'.join(units)
+
+
+####
+
+
+
+
+
 
 
 #####

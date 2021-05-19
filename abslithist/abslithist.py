@@ -32,7 +32,7 @@ PATH_MODELS = os.path.abspath(os.path.join(PATH_DATA,'models'))
 PATH_SCORES = os.path.abspath(os.path.join(PATH_DATA,'scores'))
 PATH_SCORES_BYTEXT = os.path.abspath(os.path.join(PATH_SCORES,'bytext4'))
 # PATH_SCORES_BYTEXT_SUMMARY = os.path.abspath(os.path.join(PATH_SCORES,'bytext4_summary.pkl'))
-
+if not os.path.exists(PATH_SCORES_BYTEXT): os.makedirs(PATH_SCORES_BYTEXT)
 
 ZCUT_NORMS_ORIG = 1.0
 FIELD_DIR=os.path.join(PATH_DATA,'fields')
@@ -78,7 +78,7 @@ DEFAULT_ABSCONC_CONTRAST='Abs-Conc.Median.median'
 
 PATH_PSGS=os.path.join(PATH_DATA,'counts','data.absconc.CanonFiction.psgs.v9-zcut05.jsonl')
 DEFAULT_CORPUS='CanonFiction'
-PATH_IMGCONVERT=os.path.join(PATH_HERE,'models','imgconvert.py')
+PATH_IMGCONVERT=os.path.join(PATH_HERE,'imgconvert.py')
 PATH_FIGS2=''#/home/ryan/Markdown/Drafts/AbsRealism/figures/'
 # PATH_PSG_CURRENT=os.path.join(PATH_DATA,'psgs','data.psgs.CanonFiction.v6.pkl')
 PATH_SCORES=os.path.join(PATH_DATA,'scores')
@@ -92,6 +92,48 @@ PATH_PSG_IMGS=os.path.join(PATH_SCORES,'bypsg2_smpl_img3')
 WORD2VEC_BY_SENTENCE=True
 DEFAULT_NUM_WORDS_IN_PSG=50
 
+FN_BIGHIST=os.path.join(PATH_SCORES, 'bytext5', 'BigHist.pkl')
+PATH_SCOREDATNOW=os.path.join(PATH_SCORES, 'bytext5')
+# C=lltk.load(DEFAULT_CORPUS)
+# C.au
 
-C=lltk.load(DEFAULT_CORPUS)
-C.au
+
+print_corps = {'EEBO_TCP','ECCO','ECCO_TCP','EvansTCP'}
+
+corpora_get_all_text_scores = {
+    'CanonFiction',
+    
+#     'COHA',
+    'Chicago',
+#     'DialNarr',
+#     'EvansTCP',
+#     'EEBO_TCP',
+#     'ECCO_TCP',
+    'Chadwyck',
+    'GildedAge',
+    'HathiEngLit',
+#     'HathiNovels',
+#     'HathiRomances',
+#     'HathiStories',
+#     'HathiTales',
+#     'GaleAmericanFiction',
+
+    'InternetArchive',
+    'LitLab',
+    'Sellers',
+    'TedJDH',
+}
+
+incl_meta_all_text_scores=[
+    'id',
+    'author',
+    'title',
+    'year',
+    'genre',
+    'genre2',
+    'medium',
+    'corpus',
+    'canon_genre',
+    'major_genre',
+    'subcorpus'
+]

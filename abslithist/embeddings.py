@@ -37,6 +37,12 @@ def save_skipgrams_from_paths(paths,ofn,by_sentence=BY_SENTENCE):
         for skip in yield_skipgrams_from_paths(paths,by_sentence=by_sentence):
             of.write(' '.join(skip)+'\n')
 
+class SkipgramsSamplers:
+    def __init__(self,fns,nskip,**y):
+        self.skippers=[SkipgramsSampler(fn,nskip) for fn in fns]
+    def __iter__(self):
+        for skipper in self.skippers:
+            yield from skipper
 
 class SkipgramsSampler(object):
 	def __init__(self, fn, num_skips_wanted):
@@ -47,13 +53,13 @@ class SkipgramsSampler(object):
 
 	def get_num_lines(self):
 		then=time.time()
-		print('>> [SkipgramsSampler] counting lines in',self.fn)
+# 		print('>> [SkipgramsSampler] counting lines in',self.fn)
 		with gzip.open(self.fn,'rb') if self.fn.endswith('.gz') else open(self.fn) as f:
 			for i,line in enumerate(f):
 				pass
 		num_lines=i+1
 		now=time.time()
-		print('>> [SkipgramsSampler] finished counting lines in',self.fn,'in',int(now-then),'seconds. # lines =',num_lines,'and num skips wanted =',self.num_skips_wanted)
+# 		print('>> [SkipgramsSampler] finished counting lines in',self.fn,'in',int(now-then),'seconds. # lines =',num_lines,'and num skips wanted =',self.num_skips_wanted)
 		return num_lines
 
 	def __iter__(self):
@@ -138,14 +144,26 @@ def restrict_w2v(w2v, restricted_word_set):
     w2v.vectors_norm = new_vectors_norm
     # w2v.init_sims()
 
+import logging
+    
+def disable_gensim_logging():
+    for log_name, log_obj in logging.Logger.manager.loggerDict.items():
+        if log_name.startswith('gensim'):
+            log_obj.disabled=True
 
+def enable_gensim_logging():
+    for log_name, log_obj in logging.Logger.manager.loggerDict.items():
+        if log_name.startswith('gensim'):
+            log_obj.disabled=False
 
+            
+            
 def get_model_paths(model_dir=PATH_MODELS,model_fn='model.bin',vocab_fn='vocab.txt',period_len=None):
     """
     Get all models' paths
     """
     ld=[]
-    for root,dirs,fns in os.walk(PATH_MODELS):
+    for root,dirs,fns in os.walk(model_dir):
         if model_fn in fns:
             corpus,period,run=root.split('/')[-3:]
             if not 'run_' in run:
@@ -153,8 +171,8 @@ def get_model_paths(model_dir=PATH_MODELS,model_fn='model.bin',vocab_fn='vocab.t
                 run=None
             dx={
                 'corpus':corpus,
-                'period_start':period.split('-')[0],
-                'period_end':period.split('-')[-1],
+                'period_start':int(period.split('-')[0]),
+                'period_end':int(period.split('-')[-1]),
                 'path':os.path.join(root,model_fn),
                 'path_vocab':os.path.join(root,vocab_fn)
             }
@@ -169,16 +187,19 @@ def filter_model(model,min_count=20):
     restrict_w2v(model,words_ok)
 
 
-def load_model(path_model,path_vocab=None,min_count=None):
-    if path_model.endswith('.bin') and os.path.exists(path_model):
-        model=gensim.models.Word2Vec.load(path_model,mmap='r')
-    elif path_model.endswith('.txt.gz') and os.path.exists(path_model):
+def load_model(path_model,path_vocab=None,min_count=None,cache_bin=True):
+    path_model_bin=path_model.split('.txt')[0]+'.bin' if not path_model.endswith('.bin') else path_model
+    if os.path.exists(path_model_bin):
+        model=gensim.models.KeyedVectors.load(path_model_bin,mmap='r')
+    elif os.path.exists(path_model):
         if not path_vocab: path_vocab=os.path.join(os.path.dirname(path_model,'vocab.txt'))
         if os.path.exists(path_vocab):
             model = gensim.models.KeyedVectors.load_word2vec_format(path_model,path_vocab)
             if min_count: filter_model(model,min_count=min_count)
         else:
             model = gensim.models.KeyedVectors.load_word2vec_format(path_model)
+        if cache_bin:
+            model.save(path_model_bin)
     else:
         return
     return model
@@ -223,7 +244,7 @@ def compute_vecfields():
     all_data = pmap(compute_word2field_dists, objs, num_proc=4, desc='Computing word to field distances')
 
 
-
+def get_model_paths_df(*x,**y): return pd.DataFrame(get_model_paths(*x,**y))
 
 
 
@@ -271,7 +292,6 @@ def compute_vec2vec_dists(x2vec,y2vec,xname='x',yname='y',distfunc='cosine'):
 
 
 def compute_word2field_dists(obj,force=False):
-    from abslithist.models.embeddings import compute_field_vectors
     # from scipy.spatial.distance import cosine
     from fastdist import fastdist
     import warnings

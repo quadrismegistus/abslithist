@@ -17,7 +17,7 @@ def nodblspc(x):
 
 def corpora_meta(corpora,incl_meta=[]):
     o=[]
-    for cname in corpora:
+    for cname in tqdm(corpora,desc='Loading metadata'):
         cdf=lltk.load(cname).meta
         cdf['corpus']=cname
         o.extend(cdf.reset_index().to_dict('records'))    
@@ -44,7 +44,13 @@ def get_passages_text(id,corpus=DEFAULT_CORPUS,nmin=50):
     df['txt'] = df.txt.apply(lambda x: x.replace('  ',' '))
     return df
 
-def get_current_psg_scores(cachefn=PATH_PSG_CURRENT,corpora=['CanonFiction'],num_proc=4,force=False,incl_meta=['year','author','canon_genre','major_genre'],**attrs):
+def get_current_psg_scores(
+        cachefn=PATH_PSG_CURRENT,
+        corpora=['CanonFiction'],
+        num_proc=4,
+        force=False,
+        incl_meta=['year','author','canon_genre','major_genre','subcorpus'],
+        **attrs):
     df=None
     if force or not os.path.exists(cachefn):
         objs=[(t.id,cname) for cname in corpora for t in lltk.load(cname).texts()]
@@ -72,53 +78,6 @@ def _do_get_current_psg_scores(inp):
 
 
 
-
-# Parse raw text into paras/sentences
-
-def to_sents(txt,words_recog=set(),num_word_min=45,vald={},valname='val',sep_para='\n\n',stopwords=set()):
-    ntok,nword,npara,nsent=0,-1,0,0
-    if not stopwords: stopwords=get_stopwords()
-    txt=txt.strip()
-    o=[]
-    
-    def _cleantok(x):
-        return {
-            ' ':'_',
-            '\n':'|'
-        }.get(x,x)
-    
-    paras=txt.split(sep_para) if sep_para else [txt]
-    for pi,para in enumerate(paras):
-        para=para.strip()
-        for si,sent in enumerate(tokenize_sentences(para)):
-            sent=sent.strip()
-            swords=tokenize_agnostic(sent)
-            # swords=[_cleantok(x) for x in swords]
-            for w in swords:
-                w=w.strip()
-                wl=w.lower()
-                ispunc=int(not w or not w[0].isalpha())
-                if not ispunc: nword+=1
-                dx={
-                    'i_para':npara,
-                    'i_sent':nsent,
-                    'i_word':nword,# if not ispunc else None,
-                    'i_tok':ntok,
-                    'tok':w,
-                    'tokl':wl,
-                    'is_punct':ispunc,
-                }
-                if words_recog: dx['is_recog']=int((w in words_recog) or (wl in words_recog))
-                if vald: dx[valname]=vald.get(wl,np.nan)
-                o+=[dx]
-                ntok+=1
-            nsent+=1
-        npara+=1
-    odf=pd.DataFrame(o)
-    odf=odf.set_index('i_tok') if 'i_tok' in odf.columns else odf
-    if 'tokl' in odf.columns:
-        odf['is_stopword']=odf.tokl.apply(lambda x: int(x in stopwords))
-    return odf
 
 # # Test
 # sentdf=to_sents(willoughby_full)
@@ -214,7 +173,7 @@ def to_passage_html(txt_or_score_df,valcol='val_perc',show=False):
             continue
         if row[valcol]:
             val=row[valcol]
-            if not np.isnan(val):
+            if not isnan(val):
                 val_perc_str=str(int(val* 10)).zfill(3)
                 word=f'<conc{val_perc_str}>{tok}</conc{val_perc_str}>'
                 word=f'<abs>{word}</abs>' if val<50 else f'<conc>{word}</conc>'
@@ -229,13 +188,15 @@ def to_passage_html(txt_or_score_df,valcol='val_perc',show=False):
 
 def to_psg_density(
         df,
-        other_txt='',
+        other_df=None,
         title='',
         figure_size=(6,2),
-        dpi=600,
+        dpi=150,
         valcol='val',
         font_size=6,
-        num_runs=30,
+        num_runs=100,
+        nmin_wiggle=5,
+        sample_size=100,
         all_scores=None,
         **attrs):
     p9.options.figure_size=figure_size
@@ -252,17 +213,22 @@ def to_psg_density(
         avgstr+=f' ({ordinal(perc)} percentile)'
     avgstr2=''
     
-    fig=p9.ggplot(p9.aes(x=valcol))
-    if other_txt:
-        nx=len(df[valcol].dropna())
-        otdf=to_psgdf(other_txt,stopwords=stopwords)
-        otdf=otdf[~otdf[valcol].isna()]
-        otdfavgs=[]
-        for nn in range(num_runs):
-            otdfs=otdf.sample(n=nx,replace=True)
-            fig+=p9.geom_density(color='silver',data=otdfs,alpha=0.25)
-            otdfavgs.append(otdfs[valcol].mean())
-        avgstr2=f'\nText average = {round(otdf[valcol].mean(),2)}'
+    fig=p9.ggplot(p9.aes(x=valcol, y='..density..'))
+    dfdat=df.dropna()
+    nx=len(df.dropna())
+    if other_df is not None and valcol in set(other_df.columns):
+        #other_df['i_psg']=divide_by_sent_windows(other_df,nmin=nx)
+        #ipsgs=list(set(other_df.i_psg))
+        other_dfdat=other_df.dropna()
+        for nrun in range(num_runs):
+            #smplnum=random.choice(ipsgs)
+            #otdfsmpl=other_df.query(f'i_psg=={smplnum}').dropna()
+            otdfsmpl=other_dfdat.sample(n=nx,replace=True)
+#             lenrun=len(otdfsmpl)
+#             if lenrun<nx: continue
+#             otdfsmpl=otdfsmpl.iloc[:nx]
+            fig+=p9.geom_density(color='silver',data=otdfsmpl,alpha=0.25)
+            avgstr2=f'\nText average = {round(other_df[valcol].mean(),2)}'
     fig+=p9.geom_density(data=df)
     if not title: title=f'Distribution of word concreteness scores (n={len(df.dropna())})\n{avgstr}{avgstr2}'
     fig+=p9.labs(
@@ -272,7 +238,7 @@ def to_psg_density(
     )
     fig+=p9.theme_classic()
     fig+=p9.theme(title=p9.element_text(size=font_size),text=p9.element_text(size=font_size))
-    fig+=p9.xlim(-3,3)
+    fig+=p9.xlim(-2.25,2.25)
     fig+=p9.geom_vline(xintercept=0,alpha=0.25)
     fig+=p9.geom_text(x=df[valcol].mean()+0.05,y=1,label=avgstr,inherit_aes=False,size=7,ha='left')
     return fig
@@ -306,59 +272,193 @@ def cleantxt(txt):
 #     return txt#.replace("*","").replace('`','').replace("'","").replace('"','').replace('\n',' @ ').replace('\\','')
     return txt.replace('\\n','\n').replace('\\t','\t').replace('\n',' @ ').replace('\\','').replace('*','').replace("`","").replace('_',' ')
 
-def showpsg(txt,title='',other_txt='',showxml=True,stopwords={},periods={},show=True,qnum=QNUM,figure_size=(6,2),incl_distro=True,use_color=USE_COLOR,dpi=600,font_size=6,num_runs=30):
-    df=psg2df(cleantxt(txt),stopwords=stopwords,periods=periods)
-    xml=df2xml(df)
-    if title and xml and show: printm('#### '+title)#xml='#### '+title+'\n'+xml
-    if show and xml: printm(xml)
-    avgstr=f'Passage average = {round(df.z.mean(),2)}'
-    avgstr2=''
-    # nx=1000
-    nx=len(df.z.dropna())
-    #if nx<10: nx=10
-    
-    # density plot
-    fig=None
-    if incl_distro:
-        fig=p9.ggplot(p9.aes(x='z'))
-        if other_txt:
-            otdf=psg2df(cleantxt(other_txt),stopwords=stopwords)
-            otdf=otdf[~otdf.z.isna()]
-            otdfavgs=[]
-            for nn in range(num_runs):
-                otdfs=otdf.sample(n=nx,replace=True)
-                fig+=p9.geom_density(color='silver',data=otdfs,alpha=0.25)
-                otdfavgs.append(otdfs.z.mean())
-            # avgstr2=f'\nText average = {round(np.mean(otdfavgs),2)}'
-            avgstr2=f'\nText average = {round(otdf.z.mean(),2)}'
 
-        fig+=p9.geom_density(data=df)
-        # other densities?
+
+
+def load_scores_text(t):
+    try:
+        ifn=os.path.join(PATH_SCORES_BYTEXT, t.corpus.name, t.id, 'scores.pkl')
+        return pd.read_pickle(ifn)
+    except FileNotFoundError:
+        pass
+    return None
+
+
+
+
+def show(*x,**y): return printimg(showpsg(*x,**y))
+def showcmp(*x,**y): return printimg(showpsgs(*x,**y))
+def mod(x): return modernize_spelling_in_txt(x, get_spelling_modernizer())
+
+
+def showpsg(
+        txt,
+        t=None,
+        title='',
+        other_txt='',
+        showxml=True,
+        source='Median',
+        stopwords={},
+        period=None,
+        show=True,
+        qnum=QNUM,
+        figure_size=(6,4),
+        use_color=USE_COLOR,
+        dpi=600,
+        width=800,
+        font_size=6,
+        num_runs=30,
+        scores_txt=None,
+        incl_distro=True,
+        show_html=False,
+        show_img=True,
+        ofn=None):
+
+    # get opts:
+    if not stopwords: stopwords=get_stopwords()
+    if t is not None:
+        if scores_txt is None: scores_txt = load_scores_text(t)
+        if not period: period=to_field_period(t.year)
+        if not title: title=f'{t.au}, <i>{t.shorttitle}</i> ({t.year})'
+        if not ofn: ofn=f'{t.au}.{t.ti}.t{timestamp()}.png'
+    else:
+        if not period: period='median'
+        if scores_txt is None and other_txt:
+            scores_txt = to_scores(
+                other_txt,
+                period=period,
+                stopwords=stopwords,
+                source=source
+            )
+    
+    # get scores
+    from ftfy import fix_text
+    scores_psg = to_scores(fix_text(txt),period=period,stopwords=stopwords,source=source)        
+    # get passage xml
+    xml=to_passage_html(scores_psg,show=False)
+    if title: xml=f'<p><b>{title}</b></p>\n{xml}'
+    # alt?
+    density_fig = to_psg_density(scores_psg, scores_txt, font_size=font_size) if incl_distro else None
+    
+    
+    if show_img:
+        opath=showpsgs_img(xmls=[xml],figs=[density_fig],ofn=ofn,width=width)
+        return opath
         
-        p9.options.figure_size=figure_size
-        p9.options.dpi=dpi
-        fig+=p9.labs(
-            title=f'Distribution of word concreteness scores (n={len(df.dropna())})\n{avgstr}{avgstr2}',
-            x='Concreteness score',
-            y='Frequency'
-        )
-        fig+=p9.theme_classic()
-        fig+=p9.theme(title=p9.element_text(size=font_size),text=p9.element_text(size=font_size))
-        fig+=p9.xlim(-3,3)
-    #     fig+=p9.geom_vline(xintercept=df.z.mean(),alpha=0.5)
-        fig+=p9.geom_vline(xintercept=0,alpha=0.25)
-        fig+=p9.geom_text(x=df.z.mean()+0.05,y=1,label=avgstr,inherit_aes=False,size=7,ha='left')
-        if show:
-            init_css(use_color=use_color)
-            display(fig)
-            return
-    # otherwise
-    return xml,fig
+    elif show_html:
+        if title: printm('#### '+title)#xml='#### '+title+'\n'+xml
+        if xml: printm(xml)
+        init_css(use_color=use_color)
+        if incl_distro: display(density_fig)
+        return
+    else:
+        return (xml,density_fig)
     
-#     return df
+def showpsg_html(*x,**y):
+    y['show_html'],y['show_img']=True,False
+    return showpsg(*x,**y)
+    
 
 
 
+def showpsgs_img(xmls,figs=[],ofn=None,width=800):
+    fightms=[]
+    for fi,fig in enumerate(figs):
+        tmpfigfn=os.path.abspath(f'.fig.density.{fi}.png')
+        fig.save(tmpfigfn)
+        fightm=f'<img src="{tmpfigfn}" width="{width//len(figs)}" />'
+        fightms.append(fightm)
+        
+    extra_css="""
+    <style type="text/css">
+    td { width: """+str(width//len(xmls))+"""px; line-height:2em; }
+    tr,td,th,table { border:1px solid gray; padding:0.5em; }
+    th { text-align: center; font-weight:normal; font-size:1.1em; } 
+    tr { vertical-align: top; }
+    table {
+      border-collapse: collapse;
+    }
+    </style>
+    """
+    
+    html_str = f"""
+    <html>
+    <head>
+    <title>Comparison</title>
+    {get_css()}
+    {extra_css}
+    </head>
+    <body width="{width}">
+    <center>
+    <table width="{width}">
+    <tr>
+    <td>
+    """ + '</td><td>'.join([
+        xmls[i] + ('<br/>'+fightms[i] if len(fightms)>i else '')
+        for i in range(len(xmls))
+    ]) + """
+    </td>
+    </tr>
+    </table>
+    </center>
+    </body>
+    </html>
+    """
+
+    from ftfy import fix_text
+    html_str=fix_text(lltk.clean_text(html_str))
+
+    tmphtmfn=os.path.abspath('.fig.htm.html')
+    if not ofn: ofn='.fig.now.png'
+    if not os.path.isabs(ofn): ofn=os.path.join(PATH_FIGS,ofn)
+    odir=os.path.dirname(ofn)
+    if odir and not os.path.exists(odir): os.makedirs(odir)
+    with open(tmphtmfn,'w') as of: of.write(html_str)
+    abscmd=os.path.join(PATH_HERE,'')
+    cmd=f'{PATH_IMGCONVERT} "{tmphtmfn}" "{ofn}"'
+    x=os.system(cmd)
+    return os.path.abspath(ofn)
+    
+    
+    
+    
+    
+    
+    
+    
+    
+def showpsgs(argsets,ofn=None,odir=PATH_FIGS,**kwargs):
+    xml_figs = [showpsg(*args,show_img=False,show_html=False,**kwargs) for args in argsets]
+    xmls,figs=zip(*xml_figs)
+    if not ofn:
+        ts=[x[1]
+            for x in argsets
+           if len(x)>1]
+        akey='-'.join([t.ti for t in ts])
+        ofn=f'fig.compare.{akey+"." if akey else ""}t{timestamp()}.png'
+    opath=showpsgs_img(xmls,figs,ofn=ofn)
+    return opath
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 def compare_psgs_table(inpdf,width=555,ofn='fig.psg_tbl.png',**attrs):
     inpdf['year']=inpdf.t.apply(lambda t: t.year)
     inpdf['txt']=inpdf.txt.apply(lambda x: x.strip())
@@ -374,7 +474,7 @@ def compare_psgs_table(inpdf,width=555,ofn='fig.psg_tbl.png',**attrs):
     # o html
     extra_css="""
     <style type="text/css">
-    td { width: """+str(width)+"""px; line-height:2em; }
+    td { width: """+str(width)+"""px; line-height:2em; padding: 1em; border:1px solid gray; }
     tr,td,th,table { border:1px solid gray; }
     th { text-align: center; font-weight:normal; font-size:1.1em; } 
     tr { vertical-align: top; }
@@ -397,89 +497,90 @@ def compare_psgs_table(inpdf,width=555,ofn='fig.psg_tbl.png',**attrs):
 
     return htm2png(html_str,ofn)
 
-def compare_psgs(
-        txts=[],
-        ts=[],
-        charnames=[],
-        titles=[],
-        width=444,
-        ofn=None,
-        show=False,
-        font_size=9,
-        monospace=False,
-        **attrs):
-    md1,fig1=showpsg_t(txts[0],t=ts[0],charname=charnames[0],show=show,font_size=font_size,**attrs)
-    md2,fig2=showpsg_t(txts[1],t=ts[1],charname=charnames[1],show=show,font_size=font_size,**attrs)    
-    tmpfn1='.fig.1.png'
-    tmpfn2='.fig.2.png'
-    fig1.save(tmpfn1)
-    fig2.save(tmpfn2)
+# def compare_psgs(
+#         txts=[],
+#         ts=[],
+#         charnames=[],
+#         titles=[],
+#         width=444,
+#         ofn=None,
+#         show=False,
+#         font_size=9,
+#         monospace=False,
+#         **attrs):
+#     md1,fig1=showpsg_t(txts[0],t=ts[0],charname=charnames[0],show=show,font_size=font_size,**attrs)
+#     md2,fig2=showpsg_t(txts[1],t=ts[1],charname=charnames[1],show=show,font_size=font_size,**attrs)    
+#     tmpfn1='.fig.1.png'
+#     tmpfn2='.fig.2.png'
+#     fig1.save(tmpfn1)
+#     fig2.save(tmpfn2)
     
-    dfx=pd.DataFrame([
-        {'passage':md1,'figure':f'<img src="{tmpfn1}" width="{width}" />'},
-        {'passage':md2,'figure':f'<img src="{tmpfn2}" width="{width}" />'},
-    ]).T.reset_index().drop('index',1)
+#     dfx=pd.DataFrame([
+#         {'passage':md1,'figure':f'<img src="{tmpfn1}" width="{width}" />'},
+#         {'passage':md2,'figure':f'<img src="{tmpfn2}" width="{width}" />'},
+#     ]).T.reset_index().drop('index',1)
     
-    dfx.columns = titles if titles else [
-        (charname+', ' if charname else '')+ f'from {t.au}, <i>{t.shorttitle}</i> ({t.year})'
-        for charname,t in zip(charnames,ts)
-    ]
-    from ftfy import fix_text
+#     dfx.columns = titles if titles else [
+#         (charname+', ' if charname else '')+ f'from {t.au}, <i>{t.shorttitle}</i> ({t.year})'
+#         for charname,t in zip(charnames,ts)
+#     ]
+#     from ftfy import fix_text
         
     
-    dfhtml=dfx.to_html(index=False).replace('&gt;','>').replace('&lt;','<').replace('\\n','').replace('  ',' ')    
+#     dfhtml=dfx.to_html(index=False).replace('&gt;','>').replace('&lt;','<').replace('\\n','').replace('  ',' ')    
     
 
-    extra_css="""
-    <style type="text/css">
-    td { width: """+str(width)+"""px; line-height:2em; }
-    tr,td,th,table { border:0px; }
-    th { text-align: center; font-weight:normal; font-size:1.1em; } 
-    tr { vertical-align: top; }
-    """
+#     extra_css="""
+#     <style type="text/css">
+#     td { width: """+str(width)+"""px; line-height:2em; }
+#     tr,td,th,table { border:0px; }
+#     th { text-align: center; font-weight:normal; font-size:1.1em; } 
+#     tr { vertical-align: top; }
+#     """
 
-    if monospace:
-        extra_css+="""
-        table { font-size:0.8em; font-family: Menlo,"Courier New",monospace; }
-        """
-    extra_css+="""
-    </style>
-    """
+#     if monospace:
+#         extra_css+="""
+#         table { font-size:0.8em; font-family: Menlo,"Courier New",monospace; }
+#         """
+#     extra_css+="""
+#     </style>
+#     """
     
-    html_str = f"""
-    <html>
-    <head>
-    <title>Comparison</title>
-    {get_css()}
-    {extra_css}
-    </head>
-    <body>
-    {dfhtml}
-    </body>
-    </html>
-    """
+#     html_str = f"""
+#     <html>
+#     <head>
+#     <title>Comparison</title>
+#     {get_css()}
+#     {extra_css}
+#     </head>
+#     <body>
+#     {dfhtml}
+#     </body>
+#     </html>
+#     """
 
-    html_str=fix_text(lltk.clean_text(html_str))
+#     html_str=fix_text(lltk.clean_text(html_str))
 
 
 
-    tmphtmfn=os.path.abspath('.fig.htm.html')
-    if not ofn: ofn=os.path.join(PATH_FIGS,'psgcompare',VERSION,f'{charnames[0]}-v-{charnames[1]}.png')
-    if not os.path.exists(os.path.dirname(ofn)): os.makedirs(os.path.dirname(ofn))
-    with open(tmphtmfn,'w') as of: of.write(html_str)
-    abscmd=os.path.join(PATH_HERE,'')
-    # print(PATH_IMGCONVERT,os.path.exists(PATH_IMGCONVERT))
-    # print(tmphtmfn,os.path.exists(tmphtmfn))
-    # print(ofn,os.path.exists(ofn))
-    cmd=f'{PATH_IMGCONVERT} "{tmphtmfn}" "{ofn}"'
-    # print('>>',cmd)
-    x=os.system(cmd)
-    # print('<<',x)
-    if PATH_FIGS2: os.system(f'cp {ofn} {PATH_FIGS2}')
-    return os.path.abspath(ofn)
+#     tmphtmfn=os.path.abspath('.fig.htm.html')
+#     if not ofn: ofn=os.path.join(PATH_FIGS,'psgcompare',VERSION,f'{charnames[0]}-v-{charnames[1]}.png')
+#     if not os.path.exists(os.path.dirname(ofn)): os.makedirs(os.path.dirname(ofn))
+#     with open(tmphtmfn,'w') as of: of.write(html_str)
+#     abscmd=os.path.join(PATH_HERE,'')
+#     # print(PATH_IMGCONVERT,os.path.exists(PATH_IMGCONVERT))
+#     # print(tmphtmfn,os.path.exists(tmphtmfn))
+#     # print(ofn,os.path.exists(ofn))
+#     cmd=f'{PATH_IMGCONVERT} "{tmphtmfn}" "{ofn}"'
+#     # print('>>',cmd)
+#     x=os.system(cmd)
+#     # print('<<',x)
+#     if PATH_FIGS2: os.system(f'cp {ofn} {PATH_FIGS2}')
+#     return os.path.abspath(ofn)
 
-def compare_psgs_show(*x,**y):
-    printimg(compare_psgs(*x,**y))
+# def compare_psgs_show(*x,**y):
+#     printimg(compare_psgs(*x,**y))
+
 
 
 

@@ -112,12 +112,7 @@ def modernize_spelling_in_txt(txt,spelling_d):
 	return '\n'.join(lines)
 
 
-<<<<<<< HEAD
-def tokenize(txt,lower=True,modernize=MODERNIZE_SPELLING):
-	# print(lower,modernize,'hi')
-=======
 def tokenize(txt,lower=True,modernize=False):
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
 	# clean
 	for k,v in REPLACEMENTS_b.items(): txt = txt.replace(chr(k), v)
 	for k,v in REPLACEMENTS.items(): txt = txt.replace(k, v)
@@ -130,11 +125,7 @@ def tokenize(txt,lower=True,modernize=False):
 	words = nltk.word_tokenize(txt)
 	return words
 
-<<<<<<< HEAD
-def tokenize_fast(line,lower=True,incl_punct=False):
-=======
 def tokenize_fast(line,lower=True):
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
 	import re
 	from string import punctuation
 	line=line.lower() if lower else line
@@ -143,11 +134,7 @@ def tokenize_fast(line,lower=True):
 		# r'\w+',
 		line
 	)
-<<<<<<< HEAD
-	if not incl_punct: tokens = [w.strip(punctuation) for w in tokens]
-=======
 	tokens = [w.strip(punctuation) for w in tokens]
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
 	tokens = [w for w in tokens if w]
 	return tokens
 

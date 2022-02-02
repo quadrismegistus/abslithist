@@ -18,14 +18,11 @@ def binz2(row,zcut=1,zcut_both=0):
             zbin='Both'
     return zbin
 
-<<<<<<< HEAD
 
 
 def get_current_text_scores():
     return pd.read_csv(PATH_SCORE_CURRENT)
 
-=======
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
 def get_all_passages(cname=FICTION_CORPUS_NAME):
     df=pd.read_csv(os.path.join(COUNT_DIR,f'data.absconc.{cname}.psgs.v5.csv.gz'))
     df['abs-conc']=df['num_abs']-df['num_conc']
@@ -38,11 +35,7 @@ def get_all_passages(cname=FICTION_CORPUS_NAME):
     df['zbin']=df.apply(binz2,1)
     # get year
     C=lltk.load(cname)
-<<<<<<< HEAD
-    meta=C.metadata.reset_index()
-=======
     meta=C.metadata
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
     id2year=dict(zip(meta.id,meta.year))
     df['year']=[id2year.get(idx) for idx in df.id]
     df['ybin']=df['year'].apply(biny)
@@ -76,7 +69,6 @@ def to_prodigy(df_sample,ofn,force=False):
 
 
 def printpsg(row):
-<<<<<<< HEAD
     # printm(row.passage)
         
     psg=row.passage.replace('\\\\','\n')
@@ -208,11 +200,9 @@ def to_html(df):
 """
         units.append(unit)
     return '\n\n'.join(units)
-=======
     printm(row.passage)
     try:
         printm(f'-- {row.author}, <i>{row.title}</i> ({row.year}) [abs-conc={row["abs-conc"]}; abs-conc_z={round(row["abs-conc_z"],2)}]')
         printm(f'tags: {", ".join(row.tags)}')
     except AttributeError:
         pass
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41

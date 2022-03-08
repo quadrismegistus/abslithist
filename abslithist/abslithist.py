@@ -1,7 +1,9 @@
 import os,sys; sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),'.'))
+sys.path.insert(0,'/Users/ryan/github/lltk')
+sys.path.insert(0,'/Users/ryan/github/yapmap')
 
 from yapmap import *
-sys.path.insert(0,'/Users/ryan/github/lltk')
+
 from lltk.tools import *
 import lltk
 from tools import *
@@ -21,6 +23,14 @@ import lltk
 # import mpi_slingshot as sl
 import tempfile
 from scipy.stats import percentileofscore
+import orjson
+from urllib.error import HTTPError
+import orjson
+import multiprocessing as mp
+try:
+    mp.set_start_method('fork')
+except RuntimeError:
+    pass
 
 
 
@@ -49,6 +59,7 @@ ZCUT = 0.666 #ZCUT_NORMS_ORIG
 VECNORMS_FN_PRE='data.wordnorms_vec'
 VECNORMS_FN=f'{VECNORMS_FN_PRE}.csv'
 PATH_VECNORMS = os.path.join(FIELD_DIR,VECNORMS_FN)
+PATH_ALLNORMS = os.path.join(FIELD_DIR,'data.allnorms.pkl')
 if not os.path.exists(SOURCE_DIR): os.makedirs(SOURCE_DIR)
 ZCUT = ZCUT_NORMS_ORIG
 PATH_STOPWORDS=os.path.join(FIELD_DIR,'stopwords.txt')
@@ -101,9 +112,10 @@ PATH_PSG_IMGS=os.path.join(PATH_SCORES,'bypsg2_smpl_img3')
 # )
 
 
+NLP_CLIENT=None
 
-C=lltk.load(DEFAULT_CORPUS)
-C.au
+#C=lltk.load(DEFAULT_CORPUS)
+#C.au
 
 # from tools import *
 # from words import *

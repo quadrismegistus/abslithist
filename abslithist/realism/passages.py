@@ -3,7 +3,7 @@ from abslithist import *
 
 QNUM=1000
 ZCUT=.666
-USE_COLOR=False
+USE_COLOR=True
 
 VERSION='v3'
 
@@ -76,7 +76,6 @@ def to_psgdf(sentdf_or_txt,tfield='Abs-Conc.Median.median',norms=None,tokname='t
 # psgdf=to_psgdf(sentdf)
 # psgdf
 
-
 def to_psg_html(df,valcol='val_perc'):
     words=[]
     for i,row in df.fillna('').iterrows():
@@ -148,7 +147,6 @@ def to_psg_density(
     fig+=p9.geom_text(x=df[valcol].mean()+0.05,y=1,label=avgstr,inherit_aes=False,size=7,ha='left')
     return fig
 
-
 def showpsg_t(txt,t,title='',charname='',**attrs):
     if not title:
         title=charname+', ' if charname else ''
@@ -162,8 +160,67 @@ def showpsg_t(txt,t,title='',charname='',**attrs):
         **attrs
     )
 
+def save_psg_img(md,fig,ofn='fig.png',width=444,title='',monospace=False,**kwargs):
+    tmpfn='.fig.png'
+    fig.save(tmpfn)
+    
+    dfx=pd.DataFrame([
+        {'passage':md,'figure':f'<img src="{tmpfn}" width="{width}" />'},
+    ]).T.reset_index().drop('index',1)
+    
+    dfx.columns = [title] if title else ['']
+    
+    from ftfy import fix_text
+    dfhtml=dfx.to_html(index=False).replace('&gt;','>').replace('&lt;','<').replace('\\n','').replace('  ',' ')    
+
+    extra_css="""
+    <style type="text/css">
+    td { width: """+str(width)+"""px; line-height:2em; }
+    tr,td,th,table { border:0px; }
+    th { text-align: center; font-weight:normal; font-size:1.1em; } 
+    tr { vertical-align: top; }
+    """
+
+    if monospace:
+        extra_css+="""
+        table { font-size:0.8em; font-family: Menlo,"Courier New",monospace; }
+        """
+    extra_css+="""
+    </style>
+    """
+    
+    html_str = f"""
+    <html>
+    <head>
+    <title>Comparison</title>
+    {get_css()}
+    {extra_css}
+    </head>
+    <body>
+    {dfhtml}
+    </body>
+    </html>
+    """
+
+    html_str=fix_text(lltk.clean_text(html_str))
+    tmphtmfn=os.path.abspath('.fig.htm.html')
+    with open(tmphtmfn,'w') as of: of.write(html_str)
+    abscmd=os.path.join(PATH_HERE,'')
+    cmd=f'{PATH_IMGCONVERT} "{tmphtmfn}" "{ofn}"'
+    x=os.system(cmd)
+    if PATH_FIGS2: os.system(f'cp {ofn} {PATH_FIGS2}')
+    return os.path.abspath(ofn)
 
 
+def showpsg_t_img(txt,**kwargs):
+    md,fig = showpsg_t(txt, show=False, **kwargs)
+    ofn=save_psg_img(md,fig,**kwargs)
+    return ofn
+    
+def showpsg_img(txt,**kwargs):
+    md,fig = showpsg(txt, show=False, **kwargs)
+    ofn=save_psg_img(md,fig,**kwargs)
+    return ofn
 
 
 
@@ -272,54 +329,87 @@ def cleantxt(txt):
 #     return txt#.replace("*","").replace('`','').replace("'","").replace('"','').replace('\n',' @ ').replace('\\','')
     return txt.replace('\\n','\n').replace('\\t','\t').replace('\n',' @ ').replace('\\','').replace('*','').replace("`","").replace('_',' ')
 
-def showpsg(txt,title='',other_txt='',showxml=True,stopwords={},periods={},show=True,qnum=QNUM,figure_size=(6,2),incl_distro=True,use_color=USE_COLOR,dpi=600,font_size=6,num_runs=30):
-    df=psg2df(cleantxt(txt),stopwords=stopwords,periods=periods)
-    xml=df2xml(df)
-    if title and xml and show: printm('#### '+title)#xml='#### '+title+'\n'+xml
-    if show and xml: printm(xml)
-    avgstr=f'Passage average = {round(df.z.mean(),2)}'
-    avgstr2=''
-    # nx=1000
-    nx=len(df.z.dropna())
-    #if nx<10: nx=10
+def showpsg(
+        txt,
+        title='',
+        other_txt='',
+        showxml=True,
+        stopwords={},
+        periods={},
+        show=True,
+        qnum=QNUM,
+        figure_size=(6,2),
+        incl_distro=True,
+        use_color=USE_COLOR,
+        dpi=600,
+        font_size=6,
+        num_runs=30,
+        valcol='val',
+        all_scores=None):
+    df=to_psgdf(txt)
+    html=to_psg_html(df)
     
     # density plot
     fig=None
     if incl_distro:
-        fig=p9.ggplot(p9.aes(x='z'))
-        if other_txt:
-            otdf=psg2df(cleantxt(other_txt),stopwords=stopwords)
-            otdf=otdf[~otdf.z.isna()]
-            otdfavgs=[]
-            for nn in range(num_runs):
-                otdfs=otdf.sample(n=nx,replace=True)
-                fig+=p9.geom_density(color='silver',data=otdfs,alpha=0.25)
-                otdfavgs.append(otdfs.z.mean())
-            # avgstr2=f'\nText average = {round(np.mean(otdfavgs),2)}'
-            avgstr2=f'\nText average = {round(otdf.z.mean(),2)}'
-
-        fig+=p9.geom_density(data=df)
-        # other densities?
-        
-        p9.options.figure_size=figure_size
-        p9.options.dpi=dpi
-        fig+=p9.labs(
-            title=f'Distribution of word concreteness scores (n={len(df.dropna())})\n{avgstr}{avgstr2}',
-            x='Concreteness score',
-            y='Frequency'
-        )
-        fig+=p9.theme_classic()
-        fig+=p9.theme(title=p9.element_text(size=font_size),text=p9.element_text(size=font_size))
-        fig+=p9.xlim(-3,3)
-    #     fig+=p9.geom_vline(xintercept=df.z.mean(),alpha=0.5)
-        fig+=p9.geom_vline(xintercept=0,alpha=0.25)
-        fig+=p9.geom_text(x=df.z.mean()+0.05,y=1,label=avgstr,inherit_aes=False,size=7,ha='left')
+        fig=to_psg_density(df,other_txt,all_scores=all_scores)
         if show:
             init_css(use_color=use_color)
+            printm(html)
             display(fig)
             return
-    # otherwise
-    return xml,fig
+    return html,fig
+
+
+
+# def showpsg(txt,title='',other_txt='',showxml=True,stopwords={},periods={},show=True,qnum=QNUM,figure_size=(6,2),incl_distro=True,use_color=USE_COLOR,dpi=600,font_size=6,num_runs=30):
+#     df=psg2df(cleantxt(txt),stopwords=stopwords,periods=periods)
+#     xml=df2xml(df)
+#     if title and xml and show: printm('#### '+title)#xml='#### '+title+'\n'+xml
+#     if show and xml: printm(xml)
+#     avgstr=f'Passage average = {round(df.z.mean(),2)}'
+#     avgstr2=''
+#     # nx=1000
+#     nx=len(df.z.dropna())
+#     #if nx<10: nx=10
+    
+#     # density plot
+#     fig=None
+#     if incl_distro:
+#         fig=p9.ggplot(p9.aes(x='z'))
+#         if other_txt:
+#             otdf=psg2df(cleantxt(other_txt),stopwords=stopwords)
+#             otdf=otdf[~otdf.z.isna()]
+#             otdfavgs=[]
+#             for nn in range(num_runs):
+#                 otdfs=otdf.sample(n=nx,replace=True)
+#                 fig+=p9.geom_density(color='silver',data=otdfs,alpha=0.25)
+#                 otdfavgs.append(otdfs.z.mean())
+#             # avgstr2=f'\nText average = {round(np.mean(otdfavgs),2)}'
+#             avgstr2=f'\nText average = {round(otdf.z.mean(),2)}'
+
+#         fig+=p9.geom_density(data=df)
+#         # other densities?
+        
+#         p9.options.figure_size=figure_size
+#         p9.options.dpi=dpi
+#         fig+=p9.labs(
+#             title=f'Distribution of word concreteness scores (n={len(df.dropna())})\n{avgstr}{avgstr2}',
+#             x='Concreteness score',
+#             y='Frequency'
+#         )
+#         fig+=p9.theme_classic()
+#         fig+=p9.theme(title=p9.element_text(size=font_size),text=p9.element_text(size=font_size))
+#         fig+=p9.xlim(-3,3)
+#     #     fig+=p9.geom_vline(xintercept=df.z.mean(),alpha=0.5)
+#         fig+=p9.geom_vline(xintercept=0,alpha=0.25)
+#         fig+=p9.geom_text(x=df.z.mean()+0.05,y=1,label=avgstr,inherit_aes=False,size=7,ha='left')
+#         if show:
+#             init_css(use_color=use_color)
+#             display(fig)
+#             return
+#     # otherwise
+#     return xml,fig
     
 #     return df
 
@@ -505,6 +595,7 @@ def compare_psgs_show(*x,**y):
 
 
 
+
 def get_css(use_color=USE_COLOR,qnum=QNUM,zf=3):
     zf=3
     labels=[str(x).zfill(zf) for x in range(qnum)]
@@ -514,7 +605,7 @@ def get_css(use_color=USE_COLOR,qnum=QNUM,zf=3):
     # Set colors
     if use_color:
         gradient=rdybl=list(reversed([
-        #     '#A51626',
+            # '#A51626',
             '#D73027',
             '#F46D43',
             '#FDAE61',
@@ -524,7 +615,7 @@ def get_css(use_color=USE_COLOR,qnum=QNUM,zf=3):
             '#ABD9E9',
             '#74ADD1',
             '#4575B4',
-        #     '#323695'
+            # '#323695'
         ]))
         len(rdybl)
     else:
@@ -560,19 +651,24 @@ def get_css(use_color=USE_COLOR,qnum=QNUM,zf=3):
         diffperc=int(round(diff/midpoint * width_range))
         fweight=int(round(diff/midpoint * bold_range)) + 1
 
-        opacity= (diff/midpoint *opacity_range) + 0.025
+        opacity= 1#(diff/midpoint *opacity_range) + 0.025
         cssx=f'conc{str(i).zfill(zf)}' + ' {'
-        rgbstr=str(x.rgb)[:-1] + f', {opacity})'
-        if i>=midpoint:
-            cssx+=f'background-color: rgba{rgbstr}; '
-            cssx+=f'font-weight: {fweight}; '
+        # rgbstr=str(x.rgb)[:-1] + f', {opacity})'
+        
+        if use_color:
+            cssx+=f'background-color: {x.hex}; '
         else:
-            cssx+=f'border: {diffperc}px solid dimgray; '
+            if i>=midpoint:
+                cssx+=f'background-color: rgba{rgbstr}; '
+                cssx+=f'font-weight: {fweight}; '
+            else:
+                cssx+=f'border: {diffperc}px solid dimgray; '
         cssx+=' }'
         css+=[cssx]
     css+=['p { line-height: 1.5em; }']
     cssstr=f'<style type="text/css">' + ("\n".join(css)) + '</style>'
     return cssstr
+
 
 def year2period(y):
     if y<1600: return 'C16'

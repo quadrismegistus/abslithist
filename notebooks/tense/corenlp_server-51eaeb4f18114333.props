@@ -1,0 +1,10 @@
+quote.singleQuotes = True
+
+quote.asciiQuotes = True
+
+quote.attributeQuotes = True
+
+annotators = tokenize,ssplit,pos,lemma,ner,parse,depparse,coref,quote
+
+outputFormat = json
+

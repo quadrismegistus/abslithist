@@ -11,3 +11,4 @@ ujson
 xopen
 yapmap
 numba
+orjson

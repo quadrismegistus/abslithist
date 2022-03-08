@@ -326,7 +326,9 @@ def format_norms_as_long(dfnorms,zcut=ZCUT):
     
 
 
-def get_allnorms(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
+def get_allnorms(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS, force=False):
+    if not force and os.path.exists(PATH_ALLNORMS): return read_df(PATH_ALLNORMS)
+
     # orig
     dfnorms_orig = get_orignorms(remove_stopwords=remove_stopwords)
     dfnorms_orig.columns = [c+'.orig' for c in dfnorms_orig.columns]
@@ -335,7 +337,11 @@ def get_allnorms(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
     dfnorms_vec = get_vecnorms(add_median=True,remove_stopwords=remove_stopwords)
     
     # join
-    return dfnorms_vec.join(dfnorms_orig,how='outer')
+    odf=dfnorms_vec.join(dfnorms_orig,how='outer')
+
+    # save
+    save_df(odf, PATH_ALLNORMS)
+    return odf
 
 def show_origcontrasts(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
     return show_contrasts(get_origcontrasts(remove_stopwords=remove_stopwords))

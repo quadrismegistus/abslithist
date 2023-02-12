@@ -15,7 +15,7 @@ import math,time
 import nltk,lltk
 tqdm.pandas()
 import lltk
-import mpi_slingshot as sl
+# import mpi_slingshot as sl
 import tempfile
 from scipy.stats import percentileofscore
 from yapmap import *

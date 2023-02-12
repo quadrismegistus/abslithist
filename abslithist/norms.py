@@ -345,7 +345,7 @@ def format_norms_as_long(dfnorms,zcut=ZCUT):
     for col in dfnorms.columns:
         colparts=col.split('.')
         contrast=colparts[0]
-        source=colparts[1]
+        source=colparts[1] if len(colparts)>1 else ''
         source_type='Conc' if source.split('-')[-1]=='Conc' else 'Imag'
         period=colparts[2] if len(colparts)>2 else ''
         source=f'{source}.{period}' if period else source
@@ -357,9 +357,10 @@ def format_norms_as_long(dfnorms,zcut=ZCUT):
             dx={
                 'word':word,
                 'z':z,
+                'contrast':contrast,
                 'source':source.split('.')[0],
-                'period':source.split('.')[1],
-                # 'source_type':source_type,
+                'period':source.split('.')[1] if len(source.split('.'))>1 else '',
+#                 'source_type':source_type,
                 'decision':decideifabs(z),
                 'order':SOURCES.index(source) if source in SOURCES else 0
             }
@@ -381,6 +382,7 @@ def get_allnorms(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):
         dfnorms_vec = get_vecnorms(add_median=True,remove_stopwords=remove_stopwords)
         # join
         ALLNORMS=dfnorms_vec.join(dfnorms_orig,how='outer')
+        ALLNORMS=ALLNORMS.loc[ALLNORMS.index.dropna()]
     return ALLNORMS
 
 def show_origcontrasts(remove_stopwords=REMOVE_STOPWORDS_IN_WORDNORMS):

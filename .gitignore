@@ -2,21 +2,8 @@ data
 data/*
 .*.py
 figures/*
-<<<<<<< HEAD
-*.pkl
-*.cache.*
-.*
-*.png
-*.jpg
-*.jpeg
-*.pdf
-*.html
-*.ft
-_data_
-=======
 
 
->>>>>>> ffd935b4afb7acfab2b22d8a7be044d524564e41
 
 
 
@@ -105,6 +92,15 @@ target/
 # IPython
 profile_default/
 ipython_config.py
+
+.DS_Store
+*.pkl
+.*.png
+.fig*
+*.png
+test_*
+bubble_*
+clairewords*
 
 # pyenv
 .python-version

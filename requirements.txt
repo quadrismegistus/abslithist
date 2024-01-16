@@ -12,3 +12,10 @@ xopen
 yapmap
 numba
 orjson
+loguru
+ordered_set
+tinydb
+pickle5
+networkx
+python-dotenv
+cassandra-driver

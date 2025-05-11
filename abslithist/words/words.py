@@ -111,6 +111,8 @@ def modernize_spelling_in_txt(txt,spelling_d):
 		lines+=[ln2]
 	return '\n'.join(lines)
 
+def tokenize_agnostic(txt):
+    return re.findall(r"[\w']+|[.,!?; -—–'\n]", txt)
 
 def tokenize(txt,lower=True,modernize=False):
 	# clean
@@ -122,7 +124,8 @@ def tokenize(txt,lower=True,modernize=False):
 		spellingd=get_spelling_modernizer()
 		txt=modernize_spelling_in_txt(txt,spellingd)
 	# tokenize
-	words = nltk.word_tokenize(txt)
+	# words = nltk.word_tokenize(txt)
+	words = tokenize_agnostic(txt)
 	return words
 
 def tokenize_fast(line,lower=True):

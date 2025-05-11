@@ -342,3 +342,17 @@ def tqdm_read_csv(fn,chunksize=10000,desc=None):
 	for df_chunk in tqdm(pd.read_csv(fn,chunksize=chunksize),total=get_numlines(fn),desc=desc):
 		df_list.append(df_chunk)
 	return pd.concat(df_list)
+
+def read_df(fn):
+	if '.csv' in fn:
+		return pd.read_csv(fn)
+	elif '.pkl' in fn:
+		return pd.read_pickle(fn)
+	elif '.xls' in fn:
+		return pd.read_excel(fn)
+	elif '.jsonl' in fn:
+		return pd.read_json(fn, lines=True)
+	elif '.json' in fn:
+		return pd.read_json(fn)
+	else:
+		raise ValueError(f'Unknown file type: {fn}')

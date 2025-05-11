@@ -1,5 +1,6 @@
 import os,sys; sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),'..','..'))
 from abslithist import *
+from scipy.stats import percentileofscore
 
 QNUM=1000
 ZCUT=.666

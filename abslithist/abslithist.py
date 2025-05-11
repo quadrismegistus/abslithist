@@ -31,6 +31,7 @@ PATH_VECFIELDS_PKL= os.path.join(FIELD_DIR,'data.fields_vec.pkl')
 PATH_VECFIELDS= os.path.join(FIELD_DIR,'data.fields_vec.csv.gz')
 PATH_SPELLING_D = os.path.join(FIELD_DIR,'spelling_variants_from_morphadorner.txt')
 PATH_NORMS = os.path.join(FIELD_DIR,'data.wordnorms_orig.csv')
+PATH_ALLNORMS = os.path.join(FIELD_DIR,'data.allnorms.pkl')
 VECNORMS_FN_PRE='data.wordnorms_vec'
 VECNORMS_FN=f'{VECNORMS_FN_PRE}.csv'
 PATH_VECNORMS = os.path.join(FIELD_DIR,VECNORMS_FN)

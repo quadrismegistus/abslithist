@@ -7,3 +7,4 @@ tabula-py
 gensim
 plotnine
 nltk
+colour

@@ -10,7 +10,7 @@ import plotnine as p9
 p9.options.dpi=300
 from scipy.stats import zscore
 import math,time
-import nltk,lltk
+import nltk
 
 
 
@@ -18,6 +18,7 @@ PATH_HERE = os.path.dirname(os.path.realpath(__file__))
 PATH_ROOT = os.path.abspath(os.path.join(PATH_HERE,'..'))
 PATH_DATA = os.path.abspath(os.path.join(PATH_ROOT,'data'))
 PATH_MODELS = os.path.abspath(os.path.join(PATH_DATA,'models'))
+PATH_LLTK_CORPORA = os.path.expanduser('~/lltk_data/corpora')
 ZCUT_NORMS_ORIG = 1.0
 FIELD_DIR=os.path.join(PATH_DATA,'fields')
 SOURCE_DIR=os.path.join(FIELD_DIR,'sources')
@@ -47,6 +48,6 @@ MODEL_NUM_DIM=100
 SOURCES_FOR_COUNTING = {'Median'}
 SOURCES_FOR_PLOTTING = {'PAV-Conc','PAV-Imag','MRC-Conc','MRC-Imag','MT-Conc','LSN-Imag','Median'}
 REMOVE_STOPWORDS_IN_WORDNORMS=True
-MODERNIZE_SPELLING=True
+MODERNIZE_SPELLING=False
 COUNT_WINDOW_LEN=100
 # COUNT_WINDOW_LEN=50

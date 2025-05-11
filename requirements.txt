@@ -6,3 +6,4 @@ fastdist
 tabula-py
 gensim
 plotnine
+nltk

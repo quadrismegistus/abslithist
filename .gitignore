@@ -145,3 +145,5 @@ test_*
 .DS_Store
 .data*
 .fig*
+cache*.db
+cache.dc

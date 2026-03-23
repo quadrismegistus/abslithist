@@ -161,13 +161,13 @@ def showpsg_t(txt,t,title='',charname='',**attrs):
         **attrs
     )
 
-def save_psg_img(md,fig,ofn='fig.png',width=444,title='',monospace=False,**kwargs):
+def save_psg_img(md,fig,ofn='fig.png',width=444,title='',monospace=False,use_color=USE_COLOR,**kwargs):
     tmpfn='.fig.png'
     fig.save(tmpfn)
     
     dfx=pd.DataFrame([
         {'passage':md,'figure':f'<img src="{tmpfn}" width="{width}" />'},
-    ]).T.reset_index().drop('index',1)
+    ]).T.reset_index().drop(columns=['index'])
     
     dfx.columns = [title] if title else ['']
     
@@ -193,8 +193,8 @@ def save_psg_img(md,fig,ofn='fig.png',width=444,title='',monospace=False,**kwarg
     html_str = f"""
     <html>
     <head>
-    <title>Comparison</title>
-    {get_css()}
+    <title>Comparison!!!</title>
+    {get_css(use_color=use_color)}
     {extra_css}
     </head>
     <body>
@@ -203,7 +203,8 @@ def save_psg_img(md,fig,ofn='fig.png',width=444,title='',monospace=False,**kwarg
     </html>
     """
 
-    html_str=fix_text(lltk.clean_text(html_str))
+    # html_str=fix_text(lltk.clean_text(html_str))
+    html_str=fix_text(html_str)
     tmphtmfn=os.path.abspath('.fig.htm.html')
     with open(tmphtmfn,'w') as of: of.write(html_str)
     abscmd=os.path.join(PATH_HERE,'')
@@ -652,9 +653,9 @@ def get_css(use_color=USE_COLOR,qnum=QNUM,zf=3):
         diffperc=int(round(diff/midpoint * width_range))
         fweight=int(round(diff/midpoint * bold_range)) + 1
 
-        opacity= 1#(diff/midpoint *opacity_range) + 0.025
+        opacity= (diff/midpoint *opacity_range) + 0.025
         cssx=f'conc{str(i).zfill(zf)}' + ' {'
-        # rgbstr=str(x.rgb)[:-1] + f', {opacity})'
+        rgbstr=str(x.rgb)[:-1] + f', {opacity})'
         
         if use_color:
             cssx+=f'background-color: {x.hex}; '

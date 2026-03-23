@@ -80,3 +80,19 @@ def gather_scores_corpus(C,savedir=None):
         save_df(df,scorefn)
         return df
     return read_df(scorefn)
+
+
+NORM_DICTS = {}
+
+def get_norm_dict(col='Abs-Conc.Median.median'):
+    global NORM_DICTS
+    if col not in NORM_DICTS:
+        from abslithist.words.fields import get_allnorms
+        NORM_DICTS[col] = get_allnorms()[col].dropna().to_dict()
+    return NORM_DICTS[col]
+
+
+def score_psg(txt, col='Abs-Conc.Median.median'):
+    scores = get_norm_dict(col)
+    toks = [x for x in tokenize_agnostic(txt.lower()) if x in scores]
+    return sum(scores[x] for x in toks) / len(toks) if len(toks) > 0 else np.nan

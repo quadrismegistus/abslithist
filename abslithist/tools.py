@@ -356,3 +356,71 @@ def read_df(fn):
 		return pd.read_json(fn)
 	else:
 		raise ValueError(f'Unknown file type: {fn}')
+
+
+
+def sent_tokenize_exact(text):
+    """
+    Split text into sentence chunks while preserving every character exactly.
+    Joining the returned list with ''.join(...) reconstructs the original text.
+    """
+    from nltk.tokenize import PunktSentenceTokenizer
+
+    tokenizer = PunktSentenceTokenizer()
+    spans = list(tokenizer.span_tokenize(text))  # [(start, end), ...]
+
+    chunks = []
+    last = 0
+    for start, end in spans:
+        if start > last:
+            chunks.append(text[last:start])  # exact separator/in-between text
+        chunks.append(text[start:end])       # exact sentence text
+        last = end
+
+    if last < len(text):
+        chunks.append(text[last:])           # trailing remainder, if any
+
+    assert "".join(chunks) == text
+    return chunks
+
+def slice_txt(txt,window=1000):
+    sents = sent_tokenize_exact(txt)
+    slice = []
+    slices = []
+    nw = 0
+    for sent in sents:
+        slice.append(sent)
+        nw += len(sent.split())
+        if nw >= window:
+            slices.append(''.join(slice))
+            slice = []
+            nw = 0
+    if slice:
+        slices.append(slice)
+    return slices
+
+
+def parse_json_str(response):
+    try:
+        response = response.split("```json",1)[-1]
+        response_l = response.split("```")
+        response = response_l[1] if len(response_l) > 1 and response_l[1] else response_l[0]
+        response_json = json.loads(response.strip())
+        return response_json
+    except Exception as e:
+        print(f"Error parsing JSON: {e}")
+        return None
+
+def get_avgs_df(df, gby=["genre", "corpus","decade"], y="Abs-Conc.Median.median", min_texts=None):
+    df = df.copy()
+    if min_texts: df = df.groupby(gby).filter(lambda x: x.num_texts.sum() >= min_texts)
+    df[y] = (df[y] - df[y].mean()) / df[y].std()
+    stats_df = (
+        df.groupby(gby)[y]
+        .agg(
+            mean=np.mean,
+            stderr=lambda x: x.std() / np.sqrt(len(x)),
+            count=len,
+        )
+    )
+    return stats_df.sort_index()#.sort_values('mean', ascending=False)

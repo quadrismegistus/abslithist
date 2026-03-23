@@ -8,3 +8,7 @@ gensim
 plotnine
 nltk
 colour
+requests
+ftfy
+hashstash[rec]
+litellm

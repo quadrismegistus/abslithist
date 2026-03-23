@@ -11,12 +11,14 @@ p9.options.dpi=300
 from scipy.stats import zscore
 import math,time
 import nltk
+from pprint import pprint
 
 
 
 PATH_HERE = os.path.dirname(os.path.realpath(__file__))
 PATH_ROOT = os.path.abspath(os.path.join(PATH_HERE,'..'))
 PATH_DATA = os.path.abspath(os.path.join(PATH_ROOT,'data'))
+PATH_STASH = os.path.abspath(os.path.join(PATH_DATA,'stash'))
 PATH_MODELS = os.path.abspath(os.path.join(PATH_DATA,'models'))
 PATH_LLTK_CORPORA = os.path.expanduser('~/lltk_data/corpora')
 ZCUT_NORMS_ORIG = 1.0

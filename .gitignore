@@ -156,3 +156,4 @@ test_*
 .fig*
 cache*.db
 cache.dc
+venv
